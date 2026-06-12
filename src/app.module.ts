@@ -4,7 +4,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ClinicalRecordsModule } from './clinical-records/clinical-records.module';
-import databaseConfig from './config/database.config';
 import { IcdApiModule } from './icd-api/icd-api.module';
 import { PatientsModule } from './patients/patients.module';
 import { StatisticsModule } from './statistics/statistics.module';
@@ -13,8 +12,7 @@ import { StatisticsModule } from './statistics/statistics.module';
   imports: [
     // ─── Configuración global de variables de entorno ───────────────────
     ConfigModule.forRoot({
-      isGlobal: true,       // Disponible en todos los módulos sin reimportar
-      load: [databaseConfig],
+      isGlobal: true,
       envFilePath: '.env',
       cache: true,
     }),
@@ -24,7 +22,15 @@ import { StatisticsModule } from './statistics/statistics.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        ...(configService.get('database') as object),
+        type: 'postgres',
+        host: configService.get<string>('DB_HOST', 'localhost'),
+        port: configService.get<number>('DB_PORT', 5432),
+        username: configService.get<string>('DB_USERNAME', 'postgres'),
+        password: configService.get<string>('DB_PASSWORD', 'root'),
+        database: configService.get<string>('DB_NAME', 'ivss_db'),
+        autoLoadEntities: true,
+        synchronize: configService.get<string>('NODE_ENV') !== 'production',
+        logging: configService.get<string>('NODE_ENV') === 'development',
       }),
     }),
 

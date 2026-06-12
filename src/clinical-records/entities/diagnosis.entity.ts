@@ -38,7 +38,8 @@ export class Diagnosis {
     type: 'varchar',
     length: 500,
     nullable: false,
-    comment: 'Título oficial ICD-11 del diagnóstico. Origen exclusivo: API OMS local.',
+    comment:
+      'Título oficial ICD-11 del diagnóstico. Origen exclusivo: API OMS local.',
   })
   icd_title: string;
 
@@ -51,7 +52,8 @@ export class Diagnosis {
     name: 'orden',
     type: 'smallint',
     nullable: false,
-    comment: 'Posición del diagnóstico: 1 (principal), 2, 3, 4 (secundarios). Máximo 4 por ingreso.',
+    comment:
+      'Posición del diagnóstico: 1 (principal), 2, 3, 4 (secundarios). Máximo 4 por ingreso.',
   })
   orden: number;
 

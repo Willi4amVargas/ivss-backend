@@ -6,10 +6,12 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { ClinicalRecord } from '../../clinical-records/entities/clinical_record.entity';
+import { HistoryNumber } from './history_number.entity';
+import { Admission } from '../../clinical-records/entities/admission.entity';
 
-export enum Sexo {
-  MASCULINO = 'M',
-  FEMENINO = 'F',
+export enum Genders {
+  MALE = 'M',
+  FEMALE = 'F',
 }
 
 @Entity({ name: 'patient' })
@@ -21,53 +23,47 @@ export class Patient {
    * Cédula de identidad — identidad única e irrepetible del paciente.
    * Se usa como identificador principal de negocio.
    */
-  @Index('IDX_patient_cedula', { unique: true })
+  @Index('IDX_patient_document_id', { unique: true })
   @Column({
-    name: 'cedula',
+    name: 'document_id',
     type: 'varchar',
-    length: 12,
+    length: 14,
     unique: true,
     nullable: false,
     comment: 'Cédula de identidad venezolana. Ej: 12345678',
   })
-  cedula: string;
+  document_id: string;
 
-  /**
-   * Número de historia clínica asignado manualmente por el médico.
-   * Puede ser nulo en la base de datos actual.
-   */
   @Column({
-    name: 'numero_historia',
+    name: 'names',
     type: 'varchar',
-    length: 20,
+    length: 100,
+    nullable: false,
+  })
+  names: string;
+
+  @Column({
+    name: 'lastnames',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
+  lastnames: string;
+
+  @Column({
+    name: 'address',
+    type: 'varchar',
     nullable: true,
-    comment: 'Número de historia clínica asignado manualmente por el médico.',
   })
-  numero_historia: string | null;
+  address: string;
 
   @Column({
-    name: 'nombres',
-    type: 'varchar',
-    length: 100,
-    nullable: false,
-  })
-  nombres: string;
-
-  @Column({
-    name: 'apellidos',
-    type: 'varchar',
-    length: 100,
-    nullable: false,
-  })
-  apellidos: string;
-
-  @Column({
-    name: 'sexo',
+    name: 'gender',
     type: 'enum',
-    enum: Sexo,
+    enum: Genders,
     nullable: false,
   })
-  sexo: Sexo;
+  gender: Genders;
 
   /**
    * Año de nacimiento desglosado (int2 en Postgres)
@@ -99,8 +95,36 @@ export class Patient {
   })
   birth_day: number | null;
 
+  @Column({
+    name: 'status',
+    type: 'boolean',
+    default: true,
+    nullable: false,
+  })
+  status: boolean;
+
+  @Column({
+    name: 'created_at',
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  created_at: Date;
+
+  @Column({
+    name: 'updated_at',
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  updated_at: Date;
+
   @OneToMany(() => ClinicalRecord, (record) => record.patient, {
     cascade: true,
   })
   clinical_records: ClinicalRecord[];
+
+  @OneToMany(() => HistoryNumber, (history) => history.patient)
+  history_numbers: HistoryNumber[];
+
+  @OneToMany(() => Admission, (admission) => admission.patient)
+  admissions: Admission[];
 }

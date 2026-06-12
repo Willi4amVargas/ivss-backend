@@ -55,7 +55,7 @@ export class ClinicalRecordsService {
     fechaNacimiento: number,
     fechaReferencia: number,
   ): number {
-    let edad = fechaReferencia - fechaNacimiento;
+    const edad = fechaReferencia - fechaNacimiento;
 
     if (edad < 0) {
       throw new BadRequestException(

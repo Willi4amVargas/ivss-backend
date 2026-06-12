@@ -1,4 +1,6 @@
 import {
+  IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsNotEmpty,
@@ -9,7 +11,8 @@ import {
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Sexo } from '../entities/patient.entity';
+import { Genders } from '../entities/patient.entity';
+import { Transform } from 'class-transformer';
 
 export class CreatePatientDto {
   /**
@@ -24,21 +27,29 @@ export class CreatePatientDto {
   @MaxLength(12, {
     message: 'La cédula no puede exceder los 12 caracteres.',
   })
-  cedula: string;
+  document_id: string;
 
   /**
    * Número de historia clínica asignado manualmente por el médico.
    */
   @ApiPropertyOptional({
-    description: 'Número de historia clínica',
-    example: 'HC-001',
+    description: 'Números de historia clínica del paciente',
+    example: ['HC-001', 'HC-002'],
   })
-  @IsString({ message: 'El número de historia debe ser una cadena de texto.' })
   @IsOptional()
-  @MaxLength(20, {
-    message: 'El número de historia no puede exceder los 20 caracteres.',
+  @IsArray({ message: 'El número de historia debe ser un arreglo.' })
+  @IsString({
+    each: true,
+    message: 'Cada número de historia debe ser una cadena de texto.',
   })
-  numero_historia?: string | null;
+  @MaxLength(100, {
+    each: true,
+    message: 'Cada número de historia no puede exceder los 100 caracteres.',
+  })
+  @Transform(({ value }: { value: string[] }) =>
+    value.map((item) => item.toUpperCase()),
+  )
+  history_numbers?: string[];
 
   @ApiProperty({ description: 'Nombres del paciente', example: 'JUAN CARLOS' })
   @IsString({ message: 'El campo nombres debe ser texto.' })
@@ -46,7 +57,8 @@ export class CreatePatientDto {
   @MaxLength(100, {
     message: 'Los nombres no pueden exceder los 100 caracteres.',
   })
-  nombres: string;
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  names: string;
 
   @ApiProperty({ description: 'Apellidos del paciente', example: 'PEREZ' })
   @IsString({ message: 'El campo apellidos debe ser texto.' })
@@ -54,7 +66,8 @@ export class CreatePatientDto {
   @MaxLength(100, {
     message: 'Los apellidos no pueden exceder los 100 caracteres.',
   })
-  apellidos: string;
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  lastnames: string;
 
   @ApiPropertyOptional({
     description: 'Año de nacimiento (4 dígitos)',
@@ -66,30 +79,49 @@ export class CreatePatientDto {
     message: 'El año de nacimiento no puede ser mayor al año actual.',
   })
   @IsOptional()
-  birth_year?: number | null;
+  birth_year: number | null;
 
   @ApiPropertyOptional({ description: 'Mes de nacimiento (1-12)', example: 8 })
   @IsInt({ message: 'El mes de nacimiento debe ser un número entero.' })
   @Min(1, { message: 'El mes mínimo es 1 (Enero).' })
   @Max(12, { message: 'El mes máximo es 12 (Diciembre).' })
   @IsOptional()
-  birth_month?: number | null;
+  birth_month: number | null;
 
   @ApiPropertyOptional({ description: 'Día de nacimiento (1-31)', example: 25 })
   @IsInt({ message: 'El día de nacimiento debe ser un número entero.' })
   @Min(1, { message: 'El día mínimo es 1.' })
   @Max(31, { message: 'El día máximo es 31.' })
   @IsOptional()
-  birth_day?: number | null;
+  birth_day: number | null;
 
   @ApiProperty({
-    enum: Sexo,
+    enum: Genders,
     description: 'Sexo biológico',
-    example: Sexo.MASCULINO,
+    example: Genders.MALE,
   })
-  @IsEnum(Sexo, {
-    message: `El sexo debe ser uno de los siguientes valores: ${Object.values(Sexo).join(', ')}`,
+  @IsEnum(Genders, {
+    message: `El sexo debe ser uno de los siguientes valores: ${Object.values(Genders).join(', ')}`,
   })
   @IsNotEmpty({ message: 'El sexo es obligatorio.' })
-  sexo: Sexo;
+  gender: Genders;
+
+  @ApiProperty({
+    description: 'Direccion del paciente',
+    example: 'Barrio obrero...',
+  })
+  @IsString({ message: 'El campo direccion debe ser texto.' })
+  @MaxLength(200, {
+    message: 'La direccion no pueden exceder los 200 caracteres.',
+  })
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  address: string;
+
+  @ApiProperty({
+    description: 'Estado del paciente',
+    example: true,
+  })
+  @IsBoolean()
+  @IsOptional()
+  status: boolean;
 }

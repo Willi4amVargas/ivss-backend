@@ -12,7 +12,10 @@ import { Patient } from '../../patients/entities/patient.entity';
 import { Diagnosis } from './diagnosis.entity';
 
 @Entity({ name: 'clinical_record' })
-@Check('CHK_fechas_coherentes', '"fecha_egreso" IS NULL OR "fecha_egreso" >= "fecha_ingreso"')
+@Check(
+  'CHK_fechas_coherentes',
+  '"fecha_egreso" IS NULL OR "fecha_egreso" >= "fecha_ingreso"',
+)
 export class ClinicalRecord {
   @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id: string;
@@ -30,7 +33,8 @@ export class ClinicalRecord {
     type: 'timestamp with time zone',
     nullable: true,
     default: null,
-    comment: 'Fecha y hora de egreso. NULL mientras el paciente sigue hospitalizado.',
+    comment:
+      'Fecha y hora de egreso. NULL mientras el paciente sigue hospitalizado.',
   })
   fecha_egreso: Date | null;
 
@@ -43,7 +47,8 @@ export class ClinicalRecord {
     type: 'integer',
     nullable: true,
     default: null,
-    comment: 'Días entre ingreso y egreso. Calculado y fijado estáticamente al registrar el egreso.',
+    comment:
+      'Días entre ingreso y egreso. Calculado y fijado estáticamente al registrar el egreso.',
   })
   dias_hospitalizacion: number | null;
 
@@ -55,7 +60,8 @@ export class ClinicalRecord {
     name: 'edad_ingreso',
     type: 'smallint',
     nullable: false,
-    comment: 'Edad del paciente en años completos al momento exacto del ingreso. Fijada estáticamente.',
+    comment:
+      'Edad del paciente en años completos al momento exacto del ingreso. Fijada estáticamente.',
   })
   edad_ingreso: number;
 
@@ -70,7 +76,7 @@ export class ClinicalRecord {
 
   // ─── Relaciones ───────────────────────────────────────────────────────────
 
-  @Index('IDX_clinical_record_patient_id')
+  @Index()
   @Column({ name: 'patient_id', type: 'uuid', nullable: false })
   patient_id: string;
 

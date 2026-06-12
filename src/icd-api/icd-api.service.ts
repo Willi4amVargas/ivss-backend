@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 // ─── Tipos espejados del servicio frontend ─────────────────────────────────
@@ -82,8 +86,7 @@ export class IcdApiService {
     this.linearization =
       this.configService.get<string>('ICD_LINEARIZATION') ?? 'mms';
     this.requestHeaders = {
-      'API-Version':
-        this.configService.get<string>('ICD_API_VERSION') ?? 'v2',
+      'API-Version': this.configService.get<string>('ICD_API_VERSION') ?? 'v2',
       'Accept-Language':
         this.configService.get<string>('ICD_API_LANGUAGE') ?? 'es',
       Accept: 'application/json',

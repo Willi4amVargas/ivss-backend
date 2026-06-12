@@ -10,7 +10,7 @@ import {
 } from 'typeorm';
 import { DischargeDiagnosis } from './discharges_diagnosis.entity';
 
-@Entity({ name: 'discharges' })
+@Entity({ name: 'discharge' })
 export class Discharges {
   @PrimaryGeneratedColumn('uuid', { name: 'id' })
   id: string;
@@ -33,6 +33,14 @@ export class Discharges {
     nullable: false,
   })
   discharge_exam: string;
+
+  @Column({
+    name: 'morbility_status',
+    type: 'boolean',
+    nullable: false,
+    default: false,
+  })
+  morbility_status: boolean;
 
   @Column({
     name: 'treatment_plan',

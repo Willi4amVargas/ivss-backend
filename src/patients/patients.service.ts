@@ -63,7 +63,7 @@ export class PatientsService {
   async findOne(id: string): Promise<Patient> {
     const patient = await this.patientRepository.findOne({
       where: { id },
-      relations: { clinical_records: true, history_numbers: true },
+      relations: { admissions: true, history_numbers: true },
     });
     if (!patient) {
       throw new NotFoundException(
@@ -76,7 +76,7 @@ export class PatientsService {
   async findByCedula(cedula: string): Promise<Patient> {
     const patient = await this.patientRepository.findOne({
       where: { document_id: cedula },
-      relations: { clinical_records: true, history_numbers: true },
+      relations: { admissions: true, history_numbers: true },
     });
     if (!patient) {
       throw new NotFoundException(
@@ -92,7 +92,7 @@ export class PatientsService {
         document_id: Like(`%${cedula}%`),
         status: true,
       },
-      relations: { clinical_records: true, history_numbers: true },
+      relations: { admissions: true, history_numbers: true },
       order: { lastnames: 'ASC', names: 'ASC' },
     });
     if (!patients || patients.length === 0) {

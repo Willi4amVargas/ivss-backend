@@ -1,216 +1,281 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
+import { Admission } from './entities/admission.entity';
+import { AdmissionDiagnosis } from './entities/admission_diagnosis.entity';
+import { HospitalEvolution } from './entities/hospital_evolution.entity';
+import { Discharges } from './entities/discharges.entity';
+import { DischargeDiagnosis } from './entities/discharges_diagnosis.entity';
+import { CreateAdmissionDto, UpdateAdmissionDto } from './dto/admission.dto';
+import {
+  CreateHospitalEvolutionDto,
+  UpdateHospitalEvolutionDto,
+} from './dto/hospital-evolution.dto';
+import { CreateDischargeDto, UpdateDischargeDto } from './dto/discharge.dto';
 import { PatientsService } from '../patients/patients.service';
-import { CreateClinicalRecordDto } from './dto/create-clinical-record.dto';
-import { UpdateClinicalRecordDto } from './dto/update-clinical-record.dto';
-import { ClinicalRecord } from './entities/clinical_record.entity';
-import { Diagnosis } from './entities/diagnosis.entity';
 
 @Injectable()
 export class ClinicalRecordsService {
   constructor(
-    @InjectRepository(ClinicalRecord)
-    private readonly clinicalRecordRepository: Repository<ClinicalRecord>,
-    @InjectRepository(Diagnosis)
-    private readonly diagnosisRepository: Repository<Diagnosis>,
+    @InjectRepository(Admission)
+    private readonly admissionRepo: Repository<Admission>,
+    @InjectRepository(AdmissionDiagnosis)
+    private readonly admissionDiagnosisRepo: Repository<AdmissionDiagnosis>,
+    @InjectRepository(HospitalEvolution)
+    private readonly evolutionRepo: Repository<HospitalEvolution>,
+    @InjectRepository(Discharges)
+    private readonly dischargeRepo: Repository<Discharges>,
+    @InjectRepository(DischargeDiagnosis)
+    private readonly dischargeDiagnosisRepo: Repository<DischargeDiagnosis>,
+    private readonly entityManager: EntityManager,
     private readonly patientsService: PatientsService,
   ) {}
 
-  /**
-   * Calcula la edad en años completos de una persona a una fecha de referencia.
-   * Esta función es el núcleo de la precisión estadística: fija la edad_ingreso
-   * de forma irrevocable al momento del evento clínico.
-   */
-  private calcularEdadEnFecha(
-    fechaNacimiento: Date,
-    fechaReferencia: Date,
-  ): number {
-    let edad = fechaReferencia.getFullYear() - fechaNacimiento.getFullYear();
-    const mesActual = fechaReferencia.getMonth();
-    const mesBirth = fechaNacimiento.getMonth();
+  // --- Admission & Admission Diagnosis ---
 
-    if (
-      mesActual < mesBirth ||
-      (mesActual === mesBirth &&
-        fechaReferencia.getDate() < fechaNacimiento.getDate())
-    ) {
-      edad--;
-    }
+  async createAdmission(dto: CreateAdmissionDto): Promise<Admission> {
+    // Validate patient exists
+    await this.patientsService.findOne(dto.patient_id);
 
-    if (edad < 0) {
-      throw new BadRequestException(
-        'La fecha de ingreso no puede ser anterior a la fecha de nacimiento del paciente.',
-      );
-    }
+    return this.entityManager.transaction(async (manager) => {
+      const admission = manager.create(Admission, {
+        patient_id: dto.patient_id,
+        admission_date: dto.admission_date,
+        consult_reason: dto.consult_reason,
+        current_condition: dto.current_condition,
+        background: dto.background,
+        admission_exam: dto.admission_exam,
+      });
+      const savedAdmission = await manager.save(Admission, admission);
 
-    return edad;
-  }
-
-  private calcularEdadEnYear(
-    fechaNacimiento: number,
-    fechaReferencia: number,
-  ): number {
-    const edad = fechaReferencia - fechaNacimiento;
-
-    if (edad < 0) {
-      throw new BadRequestException(
-        'La fecha de ingreso no puede ser anterior a la fecha de nacimiento del paciente.',
-      );
-    }
-
-    return edad;
-  }
-
-  /**
-   * Calcula los días de hospitalización entre ingreso y egreso.
-   * Se redondea al entero superior (1 día mínimo si hubo egreso el mismo día).
-   */
-  private calcularDiasHospitalizacion(ingreso: Date, egreso: Date): number {
-    const diffMs = egreso.getTime() - ingreso.getTime();
-    const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-    return Math.max(diffDias, 1); // Mínimo 1 día aunque sea el mismo día
-  }
-
-  async create(dto: CreateClinicalRecordDto): Promise<ClinicalRecord> {
-    // 1. Verificar que el paciente existe
-    const patient = await this.patientsService.findOne(dto.patient_id);
-
-    // 2. Construir las fechas
-    const fechaIngreso = new Date(dto.fecha_ingreso);
-    const fechaEgreso = dto.fecha_egreso ? new Date(dto.fecha_egreso) : null;
-
-    // 3. Calcular edad_ingreso estáticamente — NUNCA debe recalcularse
-    let edadIngreso = -1;
-    if (patient.birth_year) {
-      edadIngreso = this.calcularEdadEnYear(
-        patient.birth_year,
-        fechaIngreso.getFullYear(),
-      );
-    }
-
-    // 4. Calcular dias_hospitalizacion si hay fecha de egreso
-    const diasHospitalizacion =
-      fechaEgreso !== null
-        ? this.calcularDiasHospitalizacion(fechaIngreso, fechaEgreso)
-        : null;
-
-    // 5. Validar coherencia de mortalidad: si el paciente murió, debe tener fecha de egreso
-    if (dto.estatus_mortalidad === true && !fechaEgreso) {
-      throw new BadRequestException(
-        'Si el estatus de mortalidad es verdadero, se debe registrar la fecha de egreso.',
-      );
-    }
-
-    // 6. Construir y guardar la historia clínica
-    const clinicalRecord = this.clinicalRecordRepository.create({
-      patient_id: patient.id,
-      fecha_ingreso: fechaIngreso,
-      fecha_egreso: fechaEgreso,
-      edad_ingreso: edadIngreso,
-      dias_hospitalizacion: diasHospitalizacion,
-      estatus_mortalidad: dto.estatus_mortalidad ?? false,
-    });
-
-    const savedRecord =
-      await this.clinicalRecordRepository.save(clinicalRecord);
-
-    // 7. Guardar los diagnósticos vinculados
-    const diagnoses = dto.diagnoses.map((dxDto) =>
-      this.diagnosisRepository.create({
-        ...dxDto,
-        clinical_record_id: savedRecord.id,
-      }),
-    );
-
-    await this.diagnosisRepository.save(diagnoses);
-
-    return this.findOne(savedRecord.id);
-  }
-
-  async findAll(): Promise<ClinicalRecord[]> {
-    return this.clinicalRecordRepository.find({
-      relations: { patient: true, diagnoses: true },
-      order: { fecha_ingreso: 'DESC' },
-    });
-  }
-
-  async findOne(id: string): Promise<ClinicalRecord> {
-    const record = await this.clinicalRecordRepository.findOne({
-      where: { id },
-      relations: { patient: true, diagnoses: true },
-    });
-    if (!record) {
-      throw new NotFoundException(
-        `Historia clínica con ID "${id}" no encontrada.`,
-      );
-    }
-    return record;
-  }
-
-  async findByPatient(patientId: string): Promise<ClinicalRecord[]> {
-    await this.patientsService.findOne(patientId); // Verifica que el paciente existe
-    return this.clinicalRecordRepository.find({
-      where: { patient_id: patientId },
-      relations: { diagnoses: true },
-      order: { fecha_ingreso: 'DESC' },
-    });
-  }
-
-  /**
-   * Actualización principal: registrar el egreso del paciente.
-   * Al recibir fecha_egreso, recalcula dias_hospitalizacion.
-   * Si se marca mortalidad, se exige fecha de egreso.
-   */
-  async update(
-    id: string,
-    dto: UpdateClinicalRecordDto,
-  ): Promise<ClinicalRecord> {
-    const record = await this.findOne(id);
-
-    let fechaEgreso = record.fecha_egreso;
-    let diasHospitalizacion = record.dias_hospitalizacion;
-
-    if (dto.fecha_egreso !== undefined) {
-      fechaEgreso = new Date(dto.fecha_egreso);
-
-      // Re-validar coherencia con la fecha de ingreso almacenada
-      if (fechaEgreso < record.fecha_ingreso) {
-        throw new BadRequestException(
-          'La fecha de egreso no puede ser anterior a la fecha de ingreso registrada.',
+      if (dto.diagnoses && dto.diagnoses.length > 0) {
+        const diagnoses = dto.diagnoses.map((d) =>
+          manager.create(AdmissionDiagnosis, {
+            ...d,
+            admission_record_id: savedAdmission.id,
+          }),
         );
+        await manager.save(AdmissionDiagnosis, diagnoses);
       }
 
-      diasHospitalizacion = this.calcularDiasHospitalizacion(
-        record.fecha_ingreso,
-        fechaEgreso,
-      );
-    }
-
-    // Validar mortalidad requiere fecha de egreso
-    const nuevaMortalidad = dto.estatus_mortalidad ?? record.estatus_mortalidad;
-    const nuevaFechaEgreso = fechaEgreso;
-    if (nuevaMortalidad === true && !nuevaFechaEgreso) {
-      throw new BadRequestException(
-        'Para registrar la mortalidad, debe existir una fecha de egreso.',
-      );
-    }
-
-    Object.assign(record, {
-      fecha_egreso: fechaEgreso,
-      dias_hospitalizacion: diasHospitalizacion,
-      estatus_mortalidad: nuevaMortalidad,
+      return this.findOneAdmission(savedAdmission.id, manager);
     });
-
-    return this.clinicalRecordRepository.save(record);
   }
 
-  async remove(id: string): Promise<void> {
-    const record = await this.findOne(id);
-    await this.clinicalRecordRepository.remove(record);
+  async findAllAdmissions(): Promise<Admission[]> {
+    return this.admissionRepo.find({
+      relations: {
+        patient: true,
+        admission_diagnosis: true,
+      },
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async findOneAdmission(
+    id: string,
+    manager: EntityManager = this.entityManager,
+  ): Promise<Admission> {
+    const admission = await manager.findOne(Admission, {
+      where: { id },
+      relations: {
+        patient: true,
+        admission_diagnosis: true,
+      },
+    });
+    if (!admission) {
+      throw new NotFoundException(`Admission with ID ${id} not found`);
+    }
+    return admission;
+  }
+
+  async updateAdmission(
+    id: string,
+    dto: UpdateAdmissionDto,
+  ): Promise<Admission> {
+    return this.entityManager.transaction(async (manager) => {
+      const admission = await this.findOneAdmission(id, manager);
+
+      if (dto.admission_date) admission.admission_date = dto.admission_date;
+      if (dto.consult_reason) admission.consult_reason = dto.consult_reason;
+      if (dto.current_condition)
+        admission.current_condition = dto.current_condition;
+      if (dto.background) admission.background = dto.background;
+      if (dto.admission_exam) admission.admission_exam = dto.admission_exam;
+
+      await manager.save(Admission, admission);
+
+      if (dto.diagnoses) {
+        await manager.delete(AdmissionDiagnosis, { admission_record_id: id });
+        if (dto.diagnoses.length > 0) {
+          const diagnoses = dto.diagnoses.map((d) =>
+            manager.create(AdmissionDiagnosis, {
+              ...d,
+              admission_record_id: id,
+            }),
+          );
+          await manager.save(AdmissionDiagnosis, diagnoses);
+        }
+      }
+
+      return this.findOneAdmission(id, manager);
+    });
+  }
+
+  async removeAdmission(id: string): Promise<void> {
+    return this.entityManager.transaction(async (manager) => {
+      const admission = await this.findOneAdmission(id, manager);
+
+      // Manually delete discharge if exists because cascade is not configured on the Discharge side in entities
+      const discharge = await manager.findOne(Discharges, {
+        where: { admission_record_id: id },
+      });
+      if (discharge) {
+        await manager.remove(Discharges, discharge);
+      }
+
+      // Admissions and evolutions should be cascaded by DB or we can manually delete them just in case
+      await manager.delete(HospitalEvolution, { admission_record_id: id });
+
+      await manager.remove(Admission, admission);
+    });
+  }
+
+  // --- Hospital Evolution ---
+
+  async createEvolution(
+    dto: CreateHospitalEvolutionDto,
+  ): Promise<HospitalEvolution> {
+    // Check if admission exists
+    await this.findOneAdmission(dto.admission_record_id);
+
+    const evolution = this.evolutionRepo.create({
+      admission_record_id: dto.admission_record_id,
+      description: dto.description,
+    });
+    return this.evolutionRepo.save(evolution);
+  }
+
+  async findAllEvolutions(admissionId: string): Promise<HospitalEvolution[]> {
+    return this.evolutionRepo.find({
+      where: { admission_record_id: admissionId },
+      order: { created_at: 'ASC' },
+    });
+  }
+
+  async findOneEvolution(id: string): Promise<HospitalEvolution> {
+    const evolution = await this.evolutionRepo.findOne({ where: { id } });
+    if (!evolution) {
+      throw new NotFoundException(`Evolution with ID ${id} not found`);
+    }
+    return evolution;
+  }
+
+  async updateEvolution(
+    id: string,
+    dto: UpdateHospitalEvolutionDto,
+  ): Promise<HospitalEvolution> {
+    const evolution = await this.findOneEvolution(id);
+    if (dto.description) {
+      evolution.description = dto.description;
+    }
+    return this.evolutionRepo.save(evolution);
+  }
+
+  async removeEvolution(id: string): Promise<void> {
+    const evolution = await this.findOneEvolution(id);
+    await this.evolutionRepo.remove(evolution);
+  }
+
+  // --- Discharge & Discharge Diagnosis ---
+
+  async createDischarge(dto: CreateDischargeDto): Promise<Discharges> {
+    return this.entityManager.transaction(async (manager) => {
+      // Verify admission
+      await this.findOneAdmission(dto.admission_record_id, manager);
+
+      const discharge = manager.create(Discharges, {
+        admission_record_id: dto.admission_record_id,
+        discharge_date: dto.discharge_date,
+        discharge_exam: dto.discharge_exam,
+        morbility_status: dto.morbility_status,
+        treatment_plan: dto.treatment_plan,
+      });
+      const savedDischarge = await manager.save(Discharges, discharge);
+
+      if (dto.diagnoses && dto.diagnoses.length > 0) {
+        const diagnoses = dto.diagnoses.map((d) =>
+          manager.create(DischargeDiagnosis, {
+            ...d,
+            discharge_record_id: savedDischarge.id,
+          }),
+        );
+        await manager.save(DischargeDiagnosis, diagnoses);
+      }
+
+      return this.findOneDischarge(savedDischarge.id, manager);
+    });
+  }
+
+  async findAllDischarges(): Promise<Discharges[]> {
+    return this.dischargeRepo.find({
+      relations: {
+        discharges_diagnosis: true,
+      },
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async findOneDischarge(
+    id: string,
+    manager: EntityManager = this.entityManager,
+  ): Promise<Discharges> {
+    const discharge = await manager.findOne(Discharges, {
+      where: { id },
+      relations: {
+        discharges_diagnosis: true,
+      },
+    });
+    if (!discharge) {
+      throw new NotFoundException(`Discharge with ID ${id} not found`);
+    }
+    return discharge;
+  }
+
+  async updateDischarge(
+    id: string,
+    dto: UpdateDischargeDto,
+  ): Promise<Discharges> {
+    return this.entityManager.transaction(async (manager) => {
+      const discharge = await this.findOneDischarge(id, manager);
+
+      if (dto.discharge_date) discharge.discharge_date = dto.discharge_date;
+      if (dto.discharge_exam) discharge.discharge_exam = dto.discharge_exam;
+      if (dto.morbility_status !== undefined)
+        discharge.morbility_status = dto.morbility_status;
+      if (dto.treatment_plan) discharge.treatment_plan = dto.treatment_plan;
+
+      await manager.save(Discharges, discharge);
+
+      if (dto.diagnoses) {
+        await manager.delete(DischargeDiagnosis, { discharge_record_id: id });
+        if (dto.diagnoses.length > 0) {
+          const diagnoses = dto.diagnoses.map((d) =>
+            manager.create(DischargeDiagnosis, {
+              ...d,
+              discharge_record_id: id,
+            }),
+          );
+          await manager.save(DischargeDiagnosis, diagnoses);
+        }
+      }
+
+      return this.findOneDischarge(id, manager);
+    });
+  }
+
+  async removeDischarge(id: string): Promise<void> {
+    const discharge = await this.findOneDischarge(id);
+    await this.dischargeRepo.remove(discharge);
   }
 }

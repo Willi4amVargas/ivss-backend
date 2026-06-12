@@ -5,7 +5,6 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { ClinicalRecord } from '../../clinical-records/entities/clinical_record.entity';
 import { HistoryNumber } from './history_number.entity';
 import { Admission } from '../../clinical-records/entities/admission.entity';
 
@@ -116,11 +115,6 @@ export class Patient {
     default: () => 'CURRENT_TIMESTAMP',
   })
   updated_at: Date;
-
-  @OneToMany(() => ClinicalRecord, (record) => record.patient, {
-    cascade: true,
-  })
-  clinical_records: ClinicalRecord[];
 
   @OneToMany(() => HistoryNumber, (history) => history.patient)
   history_numbers: HistoryNumber[];

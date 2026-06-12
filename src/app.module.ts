@@ -6,7 +6,7 @@ import { AppService } from './app.service';
 import { ClinicalRecordsModule } from './clinical-records/clinical-records.module';
 import { IcdApiModule } from './icd-api/icd-api.module';
 import { PatientsModule } from './patients/patients.module';
-import { StatisticsModule } from './statistics/statistics.module';
+// import { StatisticsModule } from './statistics/statistics.module';
 
 @Module({
   imports: [
@@ -38,7 +38,7 @@ import { StatisticsModule } from './statistics/statistics.module';
     PatientsModule,
     ClinicalRecordsModule,
     IcdApiModule,
-    StatisticsModule,
+    // StatisticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

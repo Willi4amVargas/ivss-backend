@@ -36,7 +36,7 @@ export class AdmissionDiagnosis {
     type: 'varchar',
     nullable: true,
   })
-  description: number;
+  description: string;
 
   @Index()
   @Column({ name: 'admission_record_id', type: 'uuid', nullable: false })

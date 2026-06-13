@@ -49,9 +49,9 @@ export class ClinicalRecordsService {
       const savedAdmission = await manager.save(Admission, admission);
 
       if (dto.diagnoses && dto.diagnoses.length > 0) {
-        const diagnoses = dto.diagnoses.map((d) =>
+        const diagnoses = dto.diagnoses.map((d, index) =>
           manager.create(AdmissionDiagnosis, {
-            ...d,
+            ...d[`${index}`],
             admission_record_id: savedAdmission.id,
           }),
         );
@@ -108,9 +108,9 @@ export class ClinicalRecordsService {
       if (dto.diagnoses) {
         await manager.delete(AdmissionDiagnosis, { admission_record_id: id });
         if (dto.diagnoses.length > 0) {
-          const diagnoses = dto.diagnoses.map((d) =>
+          const diagnoses = dto.diagnoses.map((d, index) =>
             manager.create(AdmissionDiagnosis, {
-              ...d,
+              ...d[`${index}`],
               admission_record_id: id,
             }),
           );
@@ -204,9 +204,9 @@ export class ClinicalRecordsService {
       const savedDischarge = await manager.save(Discharges, discharge);
 
       if (dto.diagnoses && dto.diagnoses.length > 0) {
-        const diagnoses = dto.diagnoses.map((d) =>
+        const diagnoses = dto.diagnoses.map((d, index) =>
           manager.create(DischargeDiagnosis, {
-            ...d,
+            ...d[`${index}`], // no pregunten pq esto es asi...
             discharge_record_id: savedDischarge.id,
           }),
         );
@@ -260,9 +260,9 @@ export class ClinicalRecordsService {
       if (dto.diagnoses) {
         await manager.delete(DischargeDiagnosis, { discharge_record_id: id });
         if (dto.diagnoses.length > 0) {
-          const diagnoses = dto.diagnoses.map((d) =>
+          const diagnoses = dto.diagnoses.map((d, index) =>
             manager.create(DischargeDiagnosis, {
-              ...d,
+              ...d[`${index}`], // una vez mas no pregunten
               discharge_record_id: id,
             }),
           );

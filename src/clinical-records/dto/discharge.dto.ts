@@ -2,15 +2,15 @@ import {
   IsBoolean,
   IsDateString,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
   ValidateNested,
   IsArray,
+  ArrayMinSize,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateDischargeDiagnosisDto {
@@ -22,6 +22,7 @@ export class CreateDischargeDiagnosisDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(20)
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
   code: string;
 
   @ApiProperty({
@@ -32,15 +33,17 @@ export class CreateDischargeDiagnosisDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(500)
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
   title: string;
 
   @ApiPropertyOptional({
-    description: 'Descripción numérica adicional o identificador interno',
-    example: 456,
+    description: 'Descripción adicional',
+    example: '456',
   })
   @IsOptional()
-  @IsNumber()
-  description?: number;
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  description?: string;
 }
 
 export class UpdateDischargeDiagnosisDto {
@@ -52,6 +55,7 @@ export class UpdateDischargeDiagnosisDto {
   @IsOptional()
   @IsString()
   @MaxLength(20)
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
   code?: string;
 
   @ApiPropertyOptional({
@@ -62,15 +66,17 @@ export class UpdateDischargeDiagnosisDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
   title?: string;
 
   @ApiPropertyOptional({
-    description: 'Descripción numérica adicional o identificador interno',
-    example: 456,
+    description: 'Descripción adicional',
+    example: '456',
   })
   @IsOptional()
-  @IsNumber()
-  description?: number;
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  description?: string;
 }
 
 export class CreateDischargeDto {
@@ -99,6 +105,7 @@ export class CreateDischargeDto {
   })
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
   discharge_exam: string;
 
   @ApiPropertyOptional({
@@ -118,18 +125,21 @@ export class CreateDischargeDto {
   })
   @IsOptional()
   @IsString()
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
   treatment_plan?: string;
 
   @ApiPropertyOptional({
     description:
       'Lista de diagnósticos definitivos asociados al egreso del paciente',
-    type: [CreateDischargeDiagnosisDto],
+    type: () => [CreateDischargeDiagnosisDto],
     isArray: true,
   })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateDischargeDiagnosisDto)
-  @IsOptional()
+  @ArrayMinSize(1, {
+    message: 'Debe incluir al menos un diagnóstico de ingreso.',
+  })
   diagnoses?: CreateDischargeDiagnosisDto[];
 }
 
@@ -150,6 +160,7 @@ export class UpdateDischargeDto {
   })
   @IsOptional()
   @IsString()
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
   discharge_exam?: string;
 
   @ApiPropertyOptional({
@@ -169,12 +180,13 @@ export class UpdateDischargeDto {
   })
   @IsOptional()
   @IsString()
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
   treatment_plan?: string;
 
   @ApiPropertyOptional({
     description:
       'Lista de diagnósticos definitivos asociados al egreso del paciente',
-    type: [CreateDischargeDiagnosisDto],
+    type: () => [CreateDischargeDiagnosisDto],
     isArray: true,
   })
   @IsOptional()

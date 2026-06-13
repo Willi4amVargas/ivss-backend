@@ -3,7 +3,6 @@ import {
   IsArray,
   IsDateString,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -37,13 +36,13 @@ export class CreateAdmissionDiagnosisDto {
   title: string;
 
   @ApiPropertyOptional({
-    description: 'Descripción numérica adicional o código interno',
-    example: 123,
+    description: 'Descripción adicional',
+    example: '123',
   })
   @IsOptional()
-  @IsNumber()
-  // @Transform(({ value }: { value: string }) => value.toUpperCase())
-  description?: number;
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  description?: string;
 }
 
 export class UpdateAdmissionDiagnosisDto {
@@ -70,13 +69,13 @@ export class UpdateAdmissionDiagnosisDto {
   title?: string;
 
   @ApiPropertyOptional({
-    description: 'Descripción numérica adicional o código interno',
-    example: 123,
+    description: 'Descripción adicional',
+    example: '123',
   })
   @IsOptional()
-  @IsNumber()
-  // @Transform(({ value }: { value: string }) => value.toUpperCase())
-  description?: number;
+  @IsString()
+  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  description?: string;
 }
 
 export class CreateAdmissionDto {

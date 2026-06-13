@@ -37,7 +37,7 @@ export class DischargeDiagnosis {
     type: 'varchar',
     nullable: true,
   })
-  description: number;
+  description: string;
 
   @Index()
   @Column({ name: 'discharge_record_id', type: 'uuid', nullable: false })

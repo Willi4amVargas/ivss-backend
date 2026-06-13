@@ -21,9 +21,9 @@ async function bootstrap() {
   // Sin esto, la integridad estadística está comprometida.
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,         // Elimina campos no declarados en los DTOs
+      whitelist: true, // Elimina campos no declarados en los DTOs
       forbidNonWhitelisted: true, // Lanza error si llegan campos extra
-      transform: true,         // Convierte tipos automáticamente (string → number, etc.)
+      transform: true, // Convierte tipos automáticamente (string → number, etc.)
       transformOptions: {
         enableImplicitConversion: true,
       },
@@ -40,7 +40,10 @@ async function bootstrap() {
     )
     .setVersion('1.0')
     .addTag('patients', 'Gestión de pacientes')
-    .addTag('clinical-records', 'Gestión de historias clínicas y hospitalizaciones')
+    .addTag(
+      'clinical-records',
+      'Gestión de historias clínicas y hospitalizaciones',
+    )
     .addTag('diagnostics', 'Búsqueda de diagnósticos CIE-11')
     .addTag('statistics', 'Reportes epidemiológicos y exportación a Excel')
     .build();
@@ -55,10 +58,18 @@ async function bootstrap() {
   console.log(`🚀  Servidor corriendo en: http://localhost:${port}/api/v1`);
   console.log(`\n📋  Endpoints disponibles:`);
   console.log(`   Pacientes:         http://localhost:${port}/api/v1/patients`);
-  console.log(`   Historias Clínicas: http://localhost:${port}/api/v1/clinical-records`);
-  console.log(`   Diagnósticos ICD:  http://localhost:${port}/api/v1/diagnostics/search?query=x`);
-  console.log(`   Estadísticas:      http://localhost:${port}/api/v1/statistics/summary`);
-  console.log(`   Exportar Excel:    http://localhost:${port}/api/v1/statistics/export`);
+  console.log(
+    `   Historias Clínicas: http://localhost:${port}/api/v1/clinical-records`,
+  );
+  console.log(
+    `   Diagnósticos ICD:  http://localhost:${port}/api/v1/diagnostics/search?query=x`,
+  );
+  console.log(
+    `   Estadísticas:      http://localhost:${port}/api/v1/statistics/summary`,
+  );
+  console.log(
+    `   Exportar Excel:    http://localhost:${port}/api/v1/statistics/export`,
+  );
   console.log(`\n📚  Swagger Docs:      http://localhost:${port}/api/docs\n`);
 }
 

@@ -11,6 +11,10 @@ import {
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ToUpperCaseString,
+  ToUpperCaseStringArray,
+} from '../../utils/transforms/to-uppercase.transform';
 
 export class CreateAdmissionDiagnosisDto {
   @ApiProperty({
@@ -21,7 +25,7 @@ export class CreateAdmissionDiagnosisDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(20)
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   code: string;
 
   @ApiProperty({
@@ -32,7 +36,7 @@ export class CreateAdmissionDiagnosisDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(500)
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   title: string;
 
   @ApiPropertyOptional({
@@ -41,11 +45,17 @@ export class CreateAdmissionDiagnosisDto {
   })
   @IsOptional()
   @IsString()
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   description?: string;
 }
 
 export class UpdateAdmissionDiagnosisDto {
+  @ApiProperty({
+    description: 'ID del diagnostico a modificar',
+  })
+  @IsUUID()
+  id: string;
+
   @ApiPropertyOptional({
     description: 'Código del diagnóstico (ej. CIE-10)',
     maxLength: 20,
@@ -54,7 +64,7 @@ export class UpdateAdmissionDiagnosisDto {
   @IsOptional()
   @IsString()
   @MaxLength(20)
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   code?: string;
 
   @ApiPropertyOptional({
@@ -65,7 +75,7 @@ export class UpdateAdmissionDiagnosisDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   title?: string;
 
   @ApiPropertyOptional({
@@ -74,7 +84,7 @@ export class UpdateAdmissionDiagnosisDto {
   })
   @IsOptional()
   @IsString()
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   description?: string;
 }
 
@@ -85,7 +95,6 @@ export class CreateAdmissionDto {
   })
   @IsUUID()
   @IsNotEmpty()
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
   patient_id: string;
 
   @ApiPropertyOptional({
@@ -103,10 +112,8 @@ export class CreateAdmissionDto {
   })
   @IsArray()
   @IsString({ each: true })
-  @IsNotEmpty()
-  @Transform(({ value }: { value: string[] }) =>
-    value.map((v) => v.toUpperCase()),
-  )
+  @IsNotEmpty({ each: true })
+  @Transform(ToUpperCaseStringArray)
   consult_reason: string[];
 
   @ApiProperty({
@@ -116,7 +123,7 @@ export class CreateAdmissionDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   current_condition: string;
 
   @ApiProperty({
@@ -126,10 +133,8 @@ export class CreateAdmissionDto {
   })
   @IsArray()
   @IsString({ each: true })
-  @IsNotEmpty()
-  @Transform(({ value }: { value: string[] }) =>
-    value.map((v) => v.toUpperCase()),
-  )
+  @IsNotEmpty({ each: true })
+  @Transform(ToUpperCaseStringArray)
   background: string[];
 
   @ApiProperty({
@@ -139,7 +144,7 @@ export class CreateAdmissionDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   admission_exam: string;
 
   @ApiPropertyOptional({
@@ -148,12 +153,10 @@ export class CreateAdmissionDto {
     isArray: true,
   })
   @IsArray()
-  @ArrayMinSize(1, {
-    message: 'Debe incluir al menos un diagnóstico de ingreso.',
-  })
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CreateAdmissionDiagnosisDto)
-  diagnoses?: CreateAdmissionDiagnosisDto[];
+  diagnoses: CreateAdmissionDiagnosisDto[];
 }
 
 export class UpdateAdmissionDto {
@@ -173,9 +176,7 @@ export class UpdateAdmissionDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }: { value: string[] }) =>
-    value.map((v) => v.toUpperCase()),
-  )
+  @Transform(ToUpperCaseStringArray)
   consult_reason?: string[];
 
   @ApiPropertyOptional({
@@ -185,7 +186,7 @@ export class UpdateAdmissionDto {
   })
   @IsOptional()
   @IsString()
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   current_condition?: string;
 
   @ApiPropertyOptional({
@@ -196,9 +197,7 @@ export class UpdateAdmissionDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }: { value: string[] }) =>
-    value.map((v) => v.toUpperCase()),
-  )
+  @Transform(ToUpperCaseStringArray)
   background?: string[];
 
   @ApiPropertyOptional({
@@ -208,17 +207,17 @@ export class UpdateAdmissionDto {
   })
   @IsOptional()
   @IsString()
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   admission_exam?: string;
 
   @ApiPropertyOptional({
     description: 'Lista de diagnósticos de admisión asociados',
-    type: () => [CreateAdmissionDiagnosisDto],
+    type: () => [UpdateAdmissionDiagnosisDto],
     isArray: true,
   })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CreateAdmissionDiagnosisDto)
-  diagnoses?: CreateAdmissionDiagnosisDto[];
+  @Type(() => UpdateAdmissionDiagnosisDto)
+  diagnoses?: UpdateAdmissionDiagnosisDto[];
 }

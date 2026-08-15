@@ -67,15 +67,39 @@ export class PatientsController {
   }
 
   /**
-   * GET /patients/search/:cedula
+   * GET /patients/cedula/search/:cedula
    * Busca un paciente por su cédula de identidad.
    */
-  @Get('search/:cedula')
+  @Get('cedula/search/:cedula')
   @ApiOperation({ summary: 'Buscar pacientes por cédula' })
   @ApiResponse({ status: 200, description: 'Paciente encontrado.' })
   @ApiResponse({ status: 404, description: 'Paciente no encontrado.' })
   searchByCedula(@Param('cedula') cedula: string) {
     return this.patientsService.searchByCedula(cedula);
+  }
+
+  /**
+   * GET /history/:historia
+   * Busca un paciente por su numero de historia
+   */
+  @Get('history/:historia')
+  @ApiOperation({ summary: 'Buscar paciente por cédula' })
+  @ApiResponse({ status: 200, description: 'Paciente encontrado.' })
+  @ApiResponse({ status: 404, description: 'Paciente no encontrado.' })
+  findByHistoryNumber(@Param('historia') historia: string) {
+    return this.patientsService.findByHistoryNumber(historia);
+  }
+
+  /**
+   * GET /history/search/:historia
+   * Busca un paciente por su numero de historia
+   */
+  @Get('history/search/:historia')
+  @ApiOperation({ summary: 'Buscar pacientes por cédula' })
+  @ApiResponse({ status: 200, description: 'Paciente encontrado.' })
+  @ApiResponse({ status: 404, description: 'Paciente no encontrado.' })
+  searchByHistoryNumber(@Param('historia') historia: string) {
+    return this.patientsService.searchByHistoryNumber(historia);
   }
 
   /**
@@ -123,5 +147,24 @@ export class PatientsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.patientsService.remove(id);
+  }
+
+  /**
+   * DELETE /patients/:id
+   * Elimina el numero de historia del paciente del sistema.
+   */
+  @Delete('history/:id/:history')
+  @ApiOperation({ summary: 'Eliminar nro de historia del paciente' })
+  @ApiResponse({ status: 204, description: 'Nro de historia eliminado.' })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflicto: El paciente tiene historias clínicas asociadas.',
+  })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeHistoryNumber(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('history') history: string,
+  ) {
+    return this.patientsService.removeHistoryNumber(id, history);
   }
 }

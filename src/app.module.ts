@@ -6,14 +6,13 @@ import { AppService } from './app.service';
 import { ClinicalRecordsModule } from './clinical-records/clinical-records.module';
 import { IcdApiModule } from './icd-api/icd-api.module';
 import { PatientsModule } from './patients/patients.module';
-import { StatisticsModule } from './statistics/statistics.module';
+// import { StatisticsModule } from './statistics/statistics.module';
 
 @Module({
   imports: [
     // ─── Configuración global de variables de entorno ───────────────────
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
       cache: true,
     }),
 
@@ -27,10 +26,12 @@ import { StatisticsModule } from './statistics/statistics.module';
         port: configService.get<number>('DB_PORT', 5432),
         username: configService.get<string>('DB_USERNAME', 'postgres'),
         password: configService.get<string>('DB_PASSWORD', 'root'),
-        database: configService.get<string>('DB_NAME', 'ivss_db'),
+        database: configService.get<string>('DB_NAME', 'ivss'),
         autoLoadEntities: true,
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         logging: configService.get<string>('NODE_ENV') === 'development',
+        migrations: [__dirname + '/migrations/**/*{.js,.ts}'],
+        migrationsRun: true,
       }),
     }),
 
@@ -38,7 +39,7 @@ import { StatisticsModule } from './statistics/statistics.module';
     PatientsModule,
     ClinicalRecordsModule,
     IcdApiModule,
-    StatisticsModule,
+    // StatisticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

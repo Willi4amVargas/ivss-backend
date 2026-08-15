@@ -40,13 +40,13 @@ export class DischargeDiagnosis {
   description: string;
 
   @Index()
-  @Column({ name: 'discharge_record_id', type: 'uuid', nullable: false })
-  discharge_record_id: string;
+  @Column({ name: 'discharge_id', type: 'uuid', nullable: false })
+  discharge_id: string;
 
   @ManyToOne(() => Discharges, (record) => record, {
     nullable: false,
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'discharge_record_id' })
+  @JoinColumn({ name: 'discharge_id' })
   discharge: Admission;
 }

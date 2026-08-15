@@ -1,5 +1,7 @@
 import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import { ToUpperCaseString } from '../../utils/transforms/to-uppercase.transform';
 
 export class CreateHospitalEvolutionDto {
   @ApiProperty({
@@ -8,7 +10,7 @@ export class CreateHospitalEvolutionDto {
   })
   @IsUUID()
   @IsNotEmpty()
-  admission_record_id: string;
+  admission_id: string;
 
   @ApiProperty({
     description:
@@ -18,6 +20,7 @@ export class CreateHospitalEvolutionDto {
   })
   @IsString()
   @IsNotEmpty()
+  @Transform(ToUpperCaseString)
   description: string;
 }
 
@@ -30,5 +33,6 @@ export class UpdateHospitalEvolutionDto {
   })
   @IsOptional()
   @IsString()
+  @Transform(ToUpperCaseString)
   description?: string;
 }

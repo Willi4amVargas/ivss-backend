@@ -39,13 +39,13 @@ export class AdmissionDiagnosis {
   description: string;
 
   @Index()
-  @Column({ name: 'admission_record_id', type: 'uuid', nullable: false })
-  admission_record_id: string;
+  @Column({ name: 'admission_id', type: 'uuid', nullable: false })
+  admission_id: string;
 
   @ManyToOne(() => Admission, (record) => record.admission_diagnosis, {
     nullable: false,
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'admission_record_id' })
+  @JoinColumn({ name: 'admission_id' })
   admission: Admission;
 }

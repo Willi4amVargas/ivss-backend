@@ -1,0 +1,11 @@
+services:
+  icd-api:
+    image: whoicd/icd-api
+    ports:
+      - "5045:80"
+    environment:
+      - include=2026-01_es
+      - acceptLicense=true
+      - saveAnalytics=true
+      - enableDoris=false
+    restart: unless-stopped

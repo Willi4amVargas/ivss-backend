@@ -73,7 +73,7 @@ export class ClinicalRecordsController {
     return this.clinicalRecordsService.createEvolution(dto);
   }
 
-  @Get('evolutions/admission/:admissionId')
+  @Get('evolutions/admissions/:admissionId')
   @ApiOperation({ summary: 'Get all evolutions for an admission' })
   findAllEvolutions(@Param('admissionId', ParseUUIDPipe) admissionId: string) {
     return this.clinicalRecordsService.findAllEvolutions(admissionId);

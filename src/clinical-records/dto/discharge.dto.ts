@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ToUpperCaseString } from '../../utils/transforms/to-uppercase.transform';
 
 export class CreateDischargeDiagnosisDto {
   @ApiProperty({
@@ -22,7 +23,7 @@ export class CreateDischargeDiagnosisDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(20)
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   code: string;
 
   @ApiProperty({
@@ -33,7 +34,7 @@ export class CreateDischargeDiagnosisDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(500)
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   title: string;
 
   @ApiPropertyOptional({
@@ -42,11 +43,19 @@ export class CreateDischargeDiagnosisDto {
   })
   @IsOptional()
   @IsString()
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   description?: string;
 }
 
 export class UpdateDischargeDiagnosisDto {
+  @ApiProperty({
+    description: 'Identificador único (UUID) del diagnostico',
+    example: 'a5c84d72-1b34-4bc2-89fa-112233445566',
+  })
+  @IsUUID()
+  @IsNotEmpty()
+  id: string;
+
   @ApiPropertyOptional({
     description: 'Código del diagnóstico de egreso (ej. CIE-11 / CIE-10)',
     maxLength: 20,
@@ -55,7 +64,7 @@ export class UpdateDischargeDiagnosisDto {
   @IsOptional()
   @IsString()
   @MaxLength(20)
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   code?: string;
 
   @ApiPropertyOptional({
@@ -66,7 +75,7 @@ export class UpdateDischargeDiagnosisDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   title?: string;
 
   @ApiPropertyOptional({
@@ -75,7 +84,7 @@ export class UpdateDischargeDiagnosisDto {
   })
   @IsOptional()
   @IsString()
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   description?: string;
 }
 
@@ -87,7 +96,7 @@ export class CreateDischargeDto {
   })
   @IsUUID()
   @IsNotEmpty()
-  admission_record_id: string;
+  admission_id: string;
 
   @ApiPropertyOptional({
     description: 'Fecha y hora del egreso hospitalario en formato ISO8601',
@@ -105,7 +114,7 @@ export class CreateDischargeDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   discharge_exam: string;
 
   @ApiPropertyOptional({
@@ -125,7 +134,7 @@ export class CreateDischargeDto {
   })
   @IsOptional()
   @IsString()
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   treatment_plan?: string;
 
   @ApiPropertyOptional({
@@ -137,10 +146,8 @@ export class CreateDischargeDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateDischargeDiagnosisDto)
-  @ArrayMinSize(1, {
-    message: 'Debe incluir al menos un diagnóstico de ingreso.',
-  })
-  diagnoses?: CreateDischargeDiagnosisDto[];
+  @ArrayMinSize(1)
+  diagnoses: CreateDischargeDiagnosisDto[];
 }
 
 export class UpdateDischargeDto {
@@ -160,7 +167,7 @@ export class UpdateDischargeDto {
   })
   @IsOptional()
   @IsString()
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   discharge_exam?: string;
 
   @ApiPropertyOptional({
@@ -180,18 +187,18 @@ export class UpdateDischargeDto {
   })
   @IsOptional()
   @IsString()
-  @Transform(({ value }: { value: string }) => value.toUpperCase())
+  @Transform(ToUpperCaseString)
   treatment_plan?: string;
 
   @ApiPropertyOptional({
     description:
       'Lista de diagnósticos definitivos asociados al egreso del paciente',
-    type: () => [CreateDischargeDiagnosisDto],
+    type: () => [UpdateDischargeDiagnosisDto],
     isArray: true,
   })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CreateDischargeDiagnosisDto)
-  diagnoses?: CreateDischargeDiagnosisDto[];
+  @Type(() => UpdateDischargeDiagnosisDto)
+  diagnoses?: UpdateDischargeDiagnosisDto[];
 }

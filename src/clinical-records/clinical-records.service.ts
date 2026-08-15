@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, EntityManager, DataSource, In } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { Admission } from './entities/admission.entity';
 import { AdmissionDiagnosis } from './entities/admission_diagnosis.entity';
 import { HospitalEvolution } from './entities/hospital_evolution.entity';

@@ -9,11 +9,16 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { ClinicalRecordsService } from './clinical-records.service';
-import { CreateClinicalRecordDto } from './dto/create-clinical-record.dto';
-import { UpdateClinicalRecordDto } from './dto/update-clinical-record.dto';
+import { CreateAdmissionDto, UpdateAdmissionDto } from './dto/admission.dto';
+import {
+  CreateHospitalEvolutionDto,
+  UpdateHospitalEvolutionDto,
+} from './dto/hospital-evolution.dto';
+import { CreateDischargeDto, UpdateDischargeDto } from './dto/discharge.dto';
 
 @ApiTags('clinical-records')
 @Controller('clinical-records')
@@ -22,78 +27,126 @@ export class ClinicalRecordsController {
     private readonly clinicalRecordsService: ClinicalRecordsService,
   ) {}
 
-  /**
-   * POST /clinical-records
-   * Registra un nuevo ingreso hospitalario.
-   * Calcula automáticamente edad_ingreso y dias_hospitalizacion.
-   */
-  @Post()
-  @ApiOperation({ summary: 'Registrar un nuevo ingreso hospitalario' })
-  @ApiResponse({ status: 201, description: 'Historia clínica registrada exitosamente.' })
+  // --- Admissions ---
+
+  @Post('admissions')
+  @ApiOperation({ summary: 'Create a new admission' })
+  @ApiResponse({ status: 201, description: 'Admission created successfully.' })
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() dto: CreateClinicalRecordDto) {
-    return this.clinicalRecordsService.create(dto);
+  createAdmission(@Body() dto: CreateAdmissionDto) {
+    return this.clinicalRecordsService.createAdmission(dto);
   }
 
-  /**
-   * GET /clinical-records
-   * Retorna todas las historias clínicas con paciente y diagnósticos.
-   */
-  @Get()
-  @ApiOperation({ summary: 'Obtener todas las historias clínicas' })
-  @ApiResponse({ status: 200, description: 'Lista de historias clínicas devuelta exitosamente.' })
-  findAll() {
-    return this.clinicalRecordsService.findAll();
+  @Get('admissions')
+  @ApiOperation({ summary: 'Get all admissions' })
+  @ApiQuery({ name: 'status', required: false, enum: ['active'] })
+  findAllAdmissions(@Query('status') status?: string) {
+    if (status === 'active') {
+      return this.clinicalRecordsService.findAdmissionsWithoutDischarge();
+    }
+    return this.clinicalRecordsService.findAllAdmissions();
   }
 
-  /**
-   * GET /clinical-records/patient/:patientId
-   * Retorna todas las hospitalizaciones de un paciente específico.
-   */
-  @Get('patient/:patientId')
-  @ApiOperation({ summary: 'Obtener hospitalizaciones de un paciente' })
-  @ApiResponse({ status: 200, description: 'Hospitalizaciones devueltas exitosamente.' })
-  findByPatient(@Param('patientId', ParseUUIDPipe) patientId: string) {
-    return this.clinicalRecordsService.findByPatient(patientId);
+  @Get('admissions/:id')
+  @ApiOperation({ summary: 'Get admission by ID' })
+  findOneAdmission(@Param('id', ParseUUIDPipe) id: string) {
+    return this.clinicalRecordsService.findOneAdmission(id);
   }
 
-  /**
-   * GET /clinical-records/:id
-   * Retorna una historia clínica con su paciente y diagnósticos.
-   */
-  @Get(':id')
-  @ApiOperation({ summary: 'Obtener una historia clínica por ID' })
-  @ApiResponse({ status: 200, description: 'Historia clínica encontrada.' })
-  @ApiResponse({ status: 404, description: 'Historia clínica no encontrada.' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.clinicalRecordsService.findOne(id);
-  }
-
-  /**
-   * PATCH /clinical-records/:id
-   * Actualiza una historia clínica. Uso principal: registrar el egreso.
-   * Al recibir fecha_egreso, se recalcula dias_hospitalizacion automáticamente.
-   */
-  @Patch(':id')
-  @ApiOperation({ summary: 'Actualizar una historia clínica (Ej: registro de egreso)' })
-  @ApiResponse({ status: 200, description: 'Historia clínica actualizada exitosamente.' })
-  @ApiResponse({ status: 404, description: 'Historia clínica no encontrada.' })
-  update(
+  @Patch('admissions/:id')
+  @ApiOperation({ summary: 'Update admission by ID' })
+  updateAdmission(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateClinicalRecordDto,
+    @Body() dto: UpdateAdmissionDto,
   ) {
-    return this.clinicalRecordsService.update(id, dto);
+    return this.clinicalRecordsService.updateAdmission(id, dto);
   }
 
-  /**
-   * DELETE /clinical-records/:id
-   * Elimina una historia clínica y sus diagnósticos (CASCADE).
-   */
-  @Delete(':id')
-  @ApiOperation({ summary: 'Eliminar una historia clínica' })
-  @ApiResponse({ status: 204, description: 'Historia clínica eliminada.' })
+  @Delete('admissions/:id')
+  @ApiOperation({ summary: 'Delete admission by ID' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.clinicalRecordsService.remove(id);
+  removeAdmission(@Param('id', ParseUUIDPipe) id: string) {
+    return this.clinicalRecordsService.removeAdmission(id);
+  }
+
+  @Delete('admissions/diagnoses/:id')
+  @ApiOperation({ summary: 'Delete admission diagnoses by ID' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeAdmissionDiagnose(@Param('id', ParseUUIDPipe) id: string) {
+    return this.clinicalRecordsService.removeAdmissionDiagnose(id);
+  }
+
+  // --- Hospital Evolutions ---
+
+  @Post('evolutions')
+  @ApiOperation({ summary: 'Create a hospital evolution note' })
+  @HttpCode(HttpStatus.CREATED)
+  createEvolution(@Body() dto: CreateHospitalEvolutionDto) {
+    return this.clinicalRecordsService.createEvolution(dto);
+  }
+
+  @Get('evolutions/admissions/:admissionId')
+  @ApiOperation({ summary: 'Get all evolutions for an admission' })
+  findAllEvolutions(@Param('admissionId', ParseUUIDPipe) admissionId: string) {
+    return this.clinicalRecordsService.findAllEvolutions(admissionId);
+  }
+
+  @Get('evolutions/:id')
+  @ApiOperation({ summary: 'Get evolution by ID' })
+  findOneEvolution(@Param('id', ParseUUIDPipe) id: string) {
+    return this.clinicalRecordsService.findOneEvolution(id);
+  }
+
+  @Patch('evolutions/:id')
+  @ApiOperation({ summary: 'Update evolution by ID' })
+  updateEvolution(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateHospitalEvolutionDto,
+  ) {
+    return this.clinicalRecordsService.updateEvolution(id, dto);
+  }
+
+  @Delete('evolutions/:id')
+  @ApiOperation({ summary: 'Delete evolution by ID' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeEvolution(@Param('id', ParseUUIDPipe) id: string) {
+    return this.clinicalRecordsService.removeEvolution(id);
+  }
+
+  // --- Discharges ---
+
+  @Post('discharges')
+  @ApiOperation({ summary: 'Create a new discharge' })
+  @HttpCode(HttpStatus.CREATED)
+  createDischarge(@Body() dto: CreateDischargeDto) {
+    return this.clinicalRecordsService.createDischarge(dto);
+  }
+
+  @Get('discharges')
+  @ApiOperation({ summary: 'Get all discharges' })
+  findAllDischarges() {
+    return this.clinicalRecordsService.findAllDischarges();
+  }
+
+  @Get('discharges/:id')
+  @ApiOperation({ summary: 'Get discharge by ID' })
+  findOneDischarge(@Param('id', ParseUUIDPipe) id: string) {
+    return this.clinicalRecordsService.findOneDischarge(id);
+  }
+
+  @Patch('discharges/:id')
+  @ApiOperation({ summary: 'Update discharge by ID' })
+  updateDischarge(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateDischargeDto,
+  ) {
+    return this.clinicalRecordsService.updateDischarge(id, dto);
+  }
+
+  @Delete('discharges/:id')
+  @ApiOperation({ summary: 'Delete discharge by ID' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeDischarge(@Param('id', ParseUUIDPipe) id: string) {
+    return this.clinicalRecordsService.removeDischarge(id);
   }
 }

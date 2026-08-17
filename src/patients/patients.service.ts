@@ -4,64 +4,100 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Like, Repository } from 'typeorm';
+import { DataSource, Like, Repository } from 'typeorm';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { Patient } from './entities/patient.entity';
+import { HistoryNumber } from './entities/history_number.entity';
 
 @Injectable()
 export class PatientsService {
   constructor(
+    private dataSource: DataSource,
     @InjectRepository(Patient)
     private readonly patientRepository: Repository<Patient>,
+    @InjectRepository(HistoryNumber)
+    private readonly historyNumberRepository: Repository<HistoryNumber>,
   ) {}
 
   async create(dto: CreatePatientDto): Promise<Patient> {
-    // Normalizar la cédula a mayúsculas y sin guión para comparación interna
-    const cedulaNormalizada = dto.cedula.toUpperCase().replace('-', '');
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const existingByCedula = await queryRunner.manager.findOne(Patient, {
+        where: { document_id: dto.document_id },
+      });
 
-    // Verificar unicidad de cédula
-    const existingByCedula = await this.patientRepository.findOne({
-      where: { cedula: cedulaNormalizada },
-    });
-    if (existingByCedula) {
-      throw new ConflictException(
-        `Ya existe un paciente registrado con la cédula ${dto.cedula}.`,
-      );
+      if (existingByCedula) {
+        throw new ConflictException(
+          `Ya existe un paciente registrado con la cédula ${dto.document_id}.`,
+        );
+      }
+
+      const { history_numbers, ...otherDto } = dto;
+
+      const patient = queryRunner.manager.create(Patient, otherDto);
+      const createdPatient = await queryRunner.manager.save(patient);
+
+      if (history_numbers && history_numbers.length > 0) {
+        const historyNumbers = history_numbers.map((hn) =>
+          queryRunner.manager.create(HistoryNumber, {
+            patient_id: createdPatient.id,
+            history_number: hn,
+          }),
+        );
+
+        await queryRunner.manager.save(historyNumbers);
+      }
+
+      await queryRunner.commitTransaction();
+
+      return createdPatient;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
-
-    const patient = this.patientRepository.create({
-      ...dto,
-      cedula: cedulaNormalizada,
-    });
-
-    return this.patientRepository.save(patient);
   }
 
-  async findAll(): Promise<Patient[]> {
-    return this.patientRepository.find({
-      order: { apellidos: 'ASC', nombres: 'ASC' },
+  async findAll() {
+    const patients = await this.patientRepository.find({
+      where: { status: true },
+      order: { lastnames: 'ASC', names: 'ASC' },
+      relations: { history_numbers: true },
     });
+    const finalPatients = patients.map((p) => {
+      return {
+        ...p,
+        history_numbers: p.history_numbers.map((h) => h.history_number),
+      };
+    });
+    return finalPatients;
   }
 
-  async findOne(id: string): Promise<Patient> {
+  async findOne(id: string) {
     const patient = await this.patientRepository.findOne({
       where: { id },
-      relations: { clinical_records: true },
+      relations: { admissions: true, history_numbers: true },
     });
     if (!patient) {
       throw new NotFoundException(
         `Paciente con ID "${id}" no encontrado en el sistema.`,
       );
     }
-    return patient;
+    const patientFormat = {
+      ...patient,
+      history_numbers: patient.history_numbers.map((h) => h.history_number),
+    };
+    return patientFormat;
   }
 
   async findByCedula(cedula: string): Promise<Patient> {
-    const cedulaNormalizada = cedula.toUpperCase().replace('-', '');
     const patient = await this.patientRepository.findOne({
-      where: { cedula: cedulaNormalizada },
-      relations: { clinical_records: true },
+      where: { document_id: cedula },
+      relations: { admissions: true, history_numbers: true },
     });
     if (!patient) {
       throw new NotFoundException(
@@ -72,13 +108,13 @@ export class PatientsService {
   }
 
   async searchByCedula(cedula: string): Promise<Patient[]> {
-    const cedulaNormalizada = cedula.toUpperCase().replace('-', '');
     const patients = await this.patientRepository.find({
       where: {
-        // 4. Aplicamos el operador Like con los comodines %
-        cedula: Like(`%${cedulaNormalizada}%`),
+        document_id: Like(`%${cedula}%`),
+        status: true,
       },
-      relations: { clinical_records: true },
+      relations: { history_numbers: true },
+      order: { lastnames: 'ASC', names: 'ASC' },
     });
     if (!patients || patients.length === 0) {
       throw new NotFoundException(
@@ -88,43 +124,138 @@ export class PatientsService {
     return patients;
   }
 
-  async update(id: string, dto: UpdatePatientDto): Promise<Patient> {
-    const patient = await this.findOne(id);
+  async findByHistoryNumber(historia: string) {
+    const patient = await this.patientRepository.findOne({
+      where: {
+        history_numbers: {
+          history_number: historia,
+        },
+      },
+      relations: {
+        history_numbers: true,
+      },
+    });
+    if (!patient) {
+      throw new NotFoundException(
+        `Paciente con numero de historia "${historia}" no encontrado en el sistema.`,
+      );
+    }
+    return patient;
+  }
 
-    // Si se actualiza la cédula, verificar que no exista en otro paciente
-    if (dto.cedula) {
-      const cedulaNormalizada = dto.cedula.toUpperCase().replace('-', '');
-      const existing = await this.patientRepository.findOne({
-        where: { cedula: cedulaNormalizada },
+  async searchByHistoryNumber(historia: string) {
+    const patients = await this.patientRepository.find({
+      where: {
+        history_numbers: {
+          history_number: Like(`%${historia}%`),
+        },
+      },
+      relations: {
+        history_numbers: true,
+      },
+    });
+    if (!patients || patients.length === 0) {
+      throw new NotFoundException(
+        `No se encontraron pacientes con numero de historia similar a "${historia}".`,
+      );
+    }
+    return patients;
+  }
+
+  async update(id: string, dto: UpdatePatientDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const patient = await queryRunner.manager.findOne(Patient, {
+        where: { id },
       });
-      if (existing && existing.id !== id) {
-        throw new ConflictException(
-          `La cédula ${dto.cedula} ya está asignada a otro paciente.`,
+
+      if (!patient) {
+        throw new NotFoundException(
+          `No se encontraron pacientes con el id "${id}".`,
         );
       }
-      dto.cedula = cedulaNormalizada;
+
+      if (dto.document_id) {
+        const existing = await queryRunner.manager.findOne(Patient, {
+          where: { document_id: dto.document_id },
+        });
+        if (existing && existing.id !== id) {
+          throw new ConflictException(
+            `La cédula ${dto.document_id} ya está asignada a otro paciente.`,
+          );
+        }
+      }
+
+      const updatedPatient = await queryRunner.manager.update(Patient, id, {
+        document_id: dto.document_id,
+        names: dto.names,
+        lastnames: dto.lastnames,
+        address: dto.address,
+        gender: dto.gender,
+        birth_year: dto.birth_year,
+        birth_month: dto.birth_month,
+        status: dto.status,
+        updated_at: new Date(),
+      });
+
+      if (dto.history_numbers) {
+        for (const hn of dto.history_numbers) {
+          if (typeof hn === 'string') {
+            await queryRunner.manager.upsert(
+              HistoryNumber,
+              {
+                patient_id: id,
+                history_number: hn,
+              },
+              ['patient_id', 'history_number'],
+            );
+          }
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      return updatedPatient;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
-
-    // if (dto.numero_historia) {
-    //   const existing = await this.patientRepository.findOne({
-    //     where: { numero_historia: dto.numero_historia },
-    //   });
-    //   if (existing && existing.id !== id) {
-    //     throw new ConflictException(
-    //       `El número de historia "${dto.numero_historia}" ya está asignado a otro paciente.`,
-    //     );
-    //   }
-    // }
-
-    Object.assign(patient, {
-      ...dto,
-    });
-
-    return this.patientRepository.save(patient);
   }
 
   async remove(id: string): Promise<void> {
-    const patient = await this.findOne(id);
-    await this.patientRepository.remove(patient);
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const patient = await queryRunner.manager.findOne(Patient, {
+        where: { id },
+      });
+      if (!patient) {
+        new NotFoundException(`No se encontraron pacientes con el id "${id}".`);
+      }
+      await queryRunner.manager.update(Patient, { id }, { status: false });
+      await queryRunner.commitTransaction();
+      return;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async removeHistoryNumber(id: string, history: string) {
+    try {
+      const removeHistory = await this.historyNumberRepository.delete({
+        patient_id: id,
+        history_number: history,
+      });
+      return removeHistory;
+    } catch (error) {
+      throw error;
+    }
   }
 }

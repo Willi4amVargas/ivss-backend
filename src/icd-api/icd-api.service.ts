@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 // ─── Tipos espejados del servicio frontend ─────────────────────────────────
@@ -37,9 +41,9 @@ export interface ISearchResult {
  */
 export interface IcdDiagnosticResult {
   /** Código ICD-11. Ej: "BA00", "5A10" */
-  icd_code: string;
+  code: string;
   /** Título oficial OMS en español */
-  icd_title: string;
+  title: string;
   /** URI completa en la API de la OMS */
   uri: string;
 }
@@ -82,8 +86,7 @@ export class IcdApiService {
     this.linearization =
       this.configService.get<string>('ICD_LINEARIZATION') ?? 'mms';
     this.requestHeaders = {
-      'API-Version':
-        this.configService.get<string>('ICD_API_VERSION') ?? 'v2',
+      'API-Version': this.configService.get<string>('ICD_API_VERSION') ?? 'v2',
       'Accept-Language':
         this.configService.get<string>('ICD_API_LANGUAGE') ?? 'es',
       Accept: 'application/json',
@@ -174,8 +177,8 @@ export class IcdApiService {
           !!entity.theCode && entity.entityType === 0,
       )
       .map((entity) => ({
-        icd_code: entity.theCode,
-        icd_title: entity.title,
+        code: entity.theCode,
+        title: entity.title,
         uri: entity.id,
       }));
   }
@@ -187,8 +190,8 @@ export class IcdApiService {
    * @param uri URI completa de la entidad ICD-11
    */
   async getEntityByUri(uri: string): Promise<{
-    icd_code: string | null;
-    icd_title: string;
+    code: string | null;
+    title: string;
     uri: string;
   }> {
     const entityId = formatICDUri(uri);
@@ -217,8 +220,8 @@ export class IcdApiService {
       };
 
       return {
-        icd_code: data.code ?? null,
-        icd_title: data.title['@value'],
+        code: data.code ?? null,
+        title: data.title['@value'],
         uri: data['@id'],
       };
     } catch (error: unknown) {

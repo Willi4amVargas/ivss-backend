@@ -9,8 +9,9 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { ClinicalRecordsService } from './clinical-records.service';
 import { CreateAdmissionDto, UpdateAdmissionDto } from './dto/admission.dto';
 import {
@@ -38,7 +39,11 @@ export class ClinicalRecordsController {
 
   @Get('admissions')
   @ApiOperation({ summary: 'Get all admissions' })
-  findAllAdmissions() {
+  @ApiQuery({ name: 'status', required: false, enum: ['active'] })
+  findAllAdmissions(@Query('status') status?: string) {
+    if (status === 'active') {
+      return this.clinicalRecordsService.findAdmissionsWithoutDischarge();
+    }
     return this.clinicalRecordsService.findAllAdmissions();
   }
 
@@ -62,6 +67,13 @@ export class ClinicalRecordsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   removeAdmission(@Param('id', ParseUUIDPipe) id: string) {
     return this.clinicalRecordsService.removeAdmission(id);
+  }
+
+  @Delete('admissions/diagnoses/:id')
+  @ApiOperation({ summary: 'Delete admission diagnoses by ID' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeAdmissionDiagnose(@Param('id', ParseUUIDPipe) id: string) {
+    return this.clinicalRecordsService.removeAdmissionDiagnose(id);
   }
 
   // --- Hospital Evolutions ---

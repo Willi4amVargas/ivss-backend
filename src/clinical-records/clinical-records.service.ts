@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In } from 'typeorm';
+import { Repository, DataSource, In, IsNull } from 'typeorm';
 import { Admission } from './entities/admission.entity';
 import { AdmissionDiagnosis } from './entities/admission_diagnosis.entity';
 import { HospitalEvolution } from './entities/hospital_evolution.entity';
@@ -25,6 +25,8 @@ export class ClinicalRecordsService {
     private dataSource: DataSource,
     @InjectRepository(Admission)
     private readonly admissionRepo: Repository<Admission>,
+    @InjectRepository(AdmissionDiagnosis)
+    private readonly admissionDiagnosisRepo: Repository<AdmissionDiagnosis>,
     @InjectRepository(HospitalEvolution)
     private readonly evolutionRepo: Repository<HospitalEvolution>,
     @InjectRepository(Discharges)
@@ -112,6 +114,22 @@ export class ClinicalRecordsService {
       relations: {
         patient: true,
         admission_diagnosis: true,
+        discharge: true,
+      },
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async findAdmissionsWithoutDischarge() {
+    return this.admissionRepo.find({
+      relations: {
+        patient: true,
+        admission_diagnosis: true,
+      },
+      where: {
+        discharge: {
+          id: IsNull(),
+        },
       },
       order: { created_at: 'DESC' },
     });
@@ -123,6 +141,9 @@ export class ClinicalRecordsService {
       relations: {
         patient: true,
         admission_diagnosis: true,
+        discharge: {
+          discharges_diagnosis: true,
+        },
       },
     });
     if (!admission) {
@@ -155,14 +176,16 @@ export class ClinicalRecordsService {
       if (diagnoses) {
         for (const dg of diagnoses) {
           const { id: diagnosisId, ...diagnosisData } = dg;
-          await queryRunner.manager.update(
+          await queryRunner.manager.upsert(
             AdmissionDiagnosis,
-            { id: dg.id, admission_id: id },
             {
+              id: dg.id,
+              admission_id: id,
               code: diagnosisData.code,
               description: diagnosisData.description,
               title: diagnosisData.title,
             },
+            ['id'],
           );
         }
       }
@@ -201,6 +224,12 @@ export class ClinicalRecordsService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async removeAdmissionDiagnose(id: string) {
+    return this.admissionDiagnosisRepo.delete({
+      id,
+    });
   }
 
   // --- Hospital Evolution ---
@@ -308,6 +337,9 @@ export class ClinicalRecordsService {
     return this.dischargeRepo.find({
       relations: {
         discharges_diagnosis: true,
+        admission: {
+          patient: true,
+        },
       },
       order: { created_at: 'DESC' },
     });
@@ -317,6 +349,9 @@ export class ClinicalRecordsService {
     const discharge = await this.dischargeRepo.findOne({
       where: { id },
       relations: {
+        admission: {
+          admission_diagnosis: true,
+        },
         discharges_diagnosis: true,
       },
     });

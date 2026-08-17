@@ -5,10 +5,12 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Patient } from '../../patients/entities/patient.entity';
 import { AdmissionDiagnosis } from './admission_diagnosis.entity';
+import { Discharges } from './discharges.entity';
 
 @Entity({ name: 'admission' })
 export class Admission {
@@ -79,4 +81,7 @@ export class Admission {
     (admissionDiagnosis) => admissionDiagnosis.admission,
   )
   admission_diagnosis: AdmissionDiagnosis[];
+
+  @OneToOne(() => Discharges, (discharge) => discharge.admission)
+  discharge: Discharges;
 }

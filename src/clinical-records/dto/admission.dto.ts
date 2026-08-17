@@ -53,6 +53,7 @@ export class UpdateAdmissionDiagnosisDto {
   @ApiProperty({
     description: 'ID del diagnostico a modificar',
   })
+  @IsOptional()
   @IsUUID()
   id: string;
 

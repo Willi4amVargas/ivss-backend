@@ -62,15 +62,22 @@ export class PatientsService {
     }
   }
 
-  async findAll(): Promise<Patient[]> {
-    return this.patientRepository.find({
+  async findAll() {
+    const patients = await this.patientRepository.find({
       where: { status: true },
       order: { lastnames: 'ASC', names: 'ASC' },
       relations: { history_numbers: true },
     });
+    const finalPatients = patients.map((p) => {
+      return {
+        ...p,
+        history_numbers: p.history_numbers.map((h) => h.history_number),
+      };
+    });
+    return finalPatients;
   }
 
-  async findOne(id: string): Promise<Patient> {
+  async findOne(id: string) {
     const patient = await this.patientRepository.findOne({
       where: { id },
       relations: { admissions: true, history_numbers: true },
@@ -80,7 +87,11 @@ export class PatientsService {
         `Paciente con ID "${id}" no encontrado en el sistema.`,
       );
     }
-    return patient;
+    const patientFormat = {
+      ...patient,
+      history_numbers: patient.history_numbers.map((h) => h.history_number),
+    };
+    return patientFormat;
   }
 
   async findByCedula(cedula: string): Promise<Patient> {

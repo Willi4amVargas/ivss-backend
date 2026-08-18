@@ -1,0 +1,36 @@
+name: Remote SSH Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    environment: VPS
+
+    steps:
+      - name: Ejecutar comandos de despliegue en el VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: ${{ secrets.PORT }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            echo "🚀 Iniciando despliegue automático..."
+            cd /etc/sysred/backend || exit
+            echo "📥 Revirtiendo cualquier cambio realizado"
+            git restore .
+            echo "📥 Descargando nuevos cambios..."
+            git pull
+            echo "📦 Instalando dependencias..."
+            npm install
+            echo "🛠️ Compilando la aplicación..."
+            npm run build
+            echo "🔄 Reiniciando aplicación..."
+            systemctl restart sysivssbac.service
+            echo "✅ ¡Despliegue completado con éxito!"

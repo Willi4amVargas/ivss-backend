@@ -33,5 +33,5 @@ jobs:
             echo "🛠️ Compilando la aplicación..."
             npm run build
             echo "🔄 Reiniciando aplicación..."
-            systemctl restart sysivssbac.service
+            sudo systemctl restart sysivssbac.service
             echo "✅ ¡Despliegue completado con éxito!"

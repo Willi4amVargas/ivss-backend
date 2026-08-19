@@ -22,7 +22,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             echo "🚀 Iniciando despliegue automático..."
-            cd /etc/sysred/backend || exit
+            cd /etc/sysred/ivss/backend || exit
             echo "📥 Revirtiendo cualquier cambio realizado"
             git restore .
             echo "📥 Descargando nuevos cambios..."

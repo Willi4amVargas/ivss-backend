@@ -21,6 +21,7 @@ jobs:
           port: ${{ secrets.PORT }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            source /etc/profile.d/srft-sys.sh
             echo "🚀 Iniciando despliegue automático..."
             cd /etc/sysred/ivss/backend || exit
             echo "📥 Revirtiendo cualquier cambio realizado"

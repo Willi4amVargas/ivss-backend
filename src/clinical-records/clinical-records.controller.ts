@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -19,6 +20,7 @@ import {
   UpdateHospitalEvolutionDto,
 } from './dto/hospital-evolution.dto';
 import { CreateDischargeDto, UpdateDischargeDto } from './dto/discharge.dto';
+import { PaginationQueryParamsDto } from '../utils/pagination/pagination.dto';
 
 @ApiTags('clinical-records')
 @Controller('clinical-records')
@@ -40,11 +42,15 @@ export class ClinicalRecordsController {
   @Get('admissions')
   @ApiOperation({ summary: 'Get all admissions' })
   @ApiQuery({ name: 'status', required: false, enum: ['active'] })
-  findAllAdmissions(@Query('status') status?: string) {
+  findAllAdmissions(
+    @Query() pagination: PaginationQueryParamsDto,
+    @Query('status') status?: string,
+  ) {
     if (status === 'active') {
-      return this.clinicalRecordsService.findAdmissionsWithoutDischarge();
+      return this.clinicalRecordsService.findAllAdmissions(false, pagination);
+    } else {
+      return this.clinicalRecordsService.findAllAdmissions(true, pagination);
     }
-    return this.clinicalRecordsService.findAllAdmissions();
   }
 
   @Get('admissions/:id')
@@ -124,8 +130,8 @@ export class ClinicalRecordsController {
 
   @Get('discharges')
   @ApiOperation({ summary: 'Get all discharges' })
-  findAllDischarges() {
-    return this.clinicalRecordsService.findAllDischarges();
+  findAllDischarges(@Query() pagination: PaginationQueryParamsDto) {
+    return this.clinicalRecordsService.findAllDischarges(pagination);
   }
 
   @Get('discharges/:id')
@@ -148,5 +154,12 @@ export class ClinicalRecordsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   removeDischarge(@Param('id', ParseUUIDPipe) id: string) {
     return this.clinicalRecordsService.removeDischarge(id);
+  }
+
+  @Delete('discharges/diagnoses/:id')
+  @ApiOperation({ summary: 'Delete discharge diagnoses by ID' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeDischargeDiagnose(@Param('id', ParseUUIDPipe) id: string) {
+    return this.clinicalRecordsService.removeDischargeDiagnose(id);
   }
 }

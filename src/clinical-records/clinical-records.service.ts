@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In, IsNull } from 'typeorm';
+import { Repository, DataSource, In, IsNull, FindManyOptions } from 'typeorm';
 import { Admission } from './entities/admission.entity';
 import { AdmissionDiagnosis } from './entities/admission_diagnosis.entity';
 import { HospitalEvolution } from './entities/hospital_evolution.entity';
@@ -18,6 +18,8 @@ import {
 } from './dto/hospital-evolution.dto';
 import { CreateDischargeDto, UpdateDischargeDto } from './dto/discharge.dto';
 import { PatientsService } from '../patients/patients.service';
+import { PaginationQueryParamsDto } from '../utils/pagination/pagination.dto';
+import { PaginationMeta } from '../utils/pagination/pagination.meta';
 
 @Injectable()
 export class ClinicalRecordsService {
@@ -31,6 +33,8 @@ export class ClinicalRecordsService {
     private readonly evolutionRepo: Repository<HospitalEvolution>,
     @InjectRepository(Discharges)
     private readonly dischargeRepo: Repository<Discharges>,
+    @InjectRepository(DischargeDiagnosis)
+    private readonly dischargeDiagnosisRepo: Repository<DischargeDiagnosis>,
     private readonly patientsService: PatientsService,
   ) {}
 
@@ -100,6 +104,7 @@ export class ClinicalRecordsService {
       );
 
       await queryRunner.commitTransaction();
+      await this.dataSource.queryResultCache?.clear();
       return { ...savedAdmission, diagnosis: savedDiagnosis };
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -109,30 +114,74 @@ export class ClinicalRecordsService {
     }
   }
 
-  async findAllAdmissions() {
-    return this.admissionRepo.find({
-      relations: {
-        patient: true,
-        admission_diagnosis: true,
-        discharge: true,
-      },
-      order: { created_at: 'DESC' },
+  async findAllAdmissions(
+    status: boolean = false,
+    pagination: PaginationQueryParamsDto,
+  ) {
+    const skip = pagination.limit * (pagination.page - 1);
+    const cacheKey = `admissions_page_${pagination.page}_limit_${pagination.limit}_status_${status}`;
+    const findManyOptions: FindManyOptions<Admission> = status
+      ? {
+          relations: {
+            patient: true,
+            admission_diagnosis: true,
+            discharge: true,
+          },
+          select: {
+            admission_diagnosis: {
+              id: true,
+              code: true,
+              title: true,
+              description: true,
+            },
+          },
+          order: { created_at: 'DESC' },
+          take: pagination.limit,
+          skip: skip,
+          cache: {
+            id: cacheKey,
+            milliseconds: 86400000,
+          },
+        }
+      : {
+          relations: {
+            patient: true,
+            admission_diagnosis: true,
+            discharge: true,
+          },
+          select: {
+            admission_diagnosis: {
+              id: true,
+              code: true,
+              title: true,
+              description: true,
+            },
+          },
+          where: {
+            discharge: {
+              id: IsNull(),
+            },
+          },
+          order: { created_at: 'DESC' },
+          take: pagination.limit,
+          skip: skip,
+          cache: {
+            id: cacheKey,
+            milliseconds: 86400000,
+          },
+        };
+    const [admissions, total] = await this.admissionRepo.findAndCount({
+      ...findManyOptions,
     });
-  }
 
-  async findAdmissionsWithoutDischarge() {
-    return this.admissionRepo.find({
-      relations: {
-        patient: true,
-        admission_diagnosis: true,
-      },
-      where: {
-        discharge: {
-          id: IsNull(),
-        },
-      },
-      order: { created_at: 'DESC' },
-    });
+    return {
+      data: admissions,
+      meta: PaginationMeta({
+        currentCount: admissions.length,
+        queryParams: pagination,
+        totalCount: total,
+      }),
+    };
   }
 
   async findOneAdmission(id: string) {
@@ -145,16 +194,38 @@ export class ClinicalRecordsService {
           discharges_diagnosis: true,
         },
       },
+      select: {
+        admission_diagnosis: {
+          id: true,
+          code: true,
+          title: true,
+          description: true,
+        },
+        discharge: {
+          id: true,
+          discharge_exam: true,
+          morbility_status: true,
+          treatment_plan: true,
+          created_at: true,
+          updated_at: true,
+          discharges_diagnosis: {
+            id: true,
+            code: true,
+            title: true,
+            description: true,
+          },
+        },
+      },
+      cache: {
+        id: `admission_${id}`,
+        milliseconds: 86400000,
+      },
     });
     if (!admission) {
       throw new NotFoundException(`Admission with ID ${id} not found`);
     }
-    const admisionDiagnosis = admission.admission_diagnosis.map((ad) => {
-      const { admission_id, ...dgData } = ad;
-      return dgData;
-    });
 
-    return { ...admission, admission_diagnosis: admisionDiagnosis };
+    return { ...admission };
   }
 
   async updateAdmission(id: string, dto: UpdateAdmissionDto) {
@@ -190,6 +261,7 @@ export class ClinicalRecordsService {
         }
       }
       await queryRunner.commitTransaction();
+      await this.dataSource.queryResultCache?.clear();
       return updatedAdmission;
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -217,6 +289,7 @@ export class ClinicalRecordsService {
         admission,
       );
       await queryRunner.commitTransaction();
+      await this.dataSource.queryResultCache?.clear();
       return deletedAdmission;
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -227,6 +300,7 @@ export class ClinicalRecordsService {
   }
 
   async removeAdmissionDiagnose(id: string) {
+    await this.dataSource.queryResultCache?.clear();
     return this.admissionDiagnosisRepo.delete({
       id,
     });
@@ -240,18 +314,27 @@ export class ClinicalRecordsService {
       admission_id: dto.admission_id,
       description: dto.description,
     });
-    return this.evolutionRepo.save(evolution);
+    const savedEvolution = await this.evolutionRepo.save(evolution);
+    await this.dataSource.queryResultCache?.clear();
+    return savedEvolution;
   }
 
   async findAllEvolutions(admissionId: string): Promise<HospitalEvolution[]> {
     return this.evolutionRepo.find({
       where: { admission_id: admissionId },
       order: { created_at: 'ASC' },
+      cache: {
+        id: `admission_evolutions_${admissionId}`,
+        milliseconds: 86400000,
+      },
     });
   }
 
   async findOneEvolution(id: string): Promise<HospitalEvolution> {
-    const evolution = await this.evolutionRepo.findOne({ where: { id } });
+    const evolution = await this.evolutionRepo.findOne({
+      where: { id },
+      cache: { id: `evolution_${id}`, milliseconds: 86400000 },
+    });
     if (!evolution) {
       throw new NotFoundException(`Evolution with ID ${id} not found`);
     }
@@ -259,15 +342,19 @@ export class ClinicalRecordsService {
   }
 
   async updateEvolution(id: string, dto: UpdateHospitalEvolutionDto) {
-    return this.evolutionRepo.update(id, {
+    const evolutionUpdated = await this.evolutionRepo.update(id, {
       description: dto.description,
     });
+    await this.dataSource.queryResultCache?.clear();
+    return evolutionUpdated;
   }
 
   async removeEvolution(id: string) {
-    return this.evolutionRepo.delete({
+    const deleteEvolution = await this.evolutionRepo.delete({
       id,
     });
+    await this.dataSource.queryResultCache?.clear();
+    return deleteEvolution;
   }
 
   // --- Discharge & Discharge Diagnosis ---
@@ -319,6 +406,7 @@ export class ClinicalRecordsService {
         }),
       );
       await queryRunner.commitTransaction();
+      await this.dataSource.queryResultCache?.clear();
       return { ...saveDischarge, diagnosis: savedDiagnosis };
     } catch (error: any) {
       await queryRunner.rollbackTransaction();
@@ -333,16 +421,40 @@ export class ClinicalRecordsService {
     }
   }
 
-  async findAllDischarges(): Promise<Discharges[]> {
-    return this.dischargeRepo.find({
+  async findAllDischarges(pagination: PaginationQueryParamsDto) {
+    const skip = pagination.limit * (pagination.page - 1);
+    const cacheKey = `admissions_page_${pagination.page}_limit_${pagination.limit}`;
+    const [discharges, total] = await this.dischargeRepo.findAndCount({
       relations: {
         discharges_diagnosis: true,
         admission: {
           patient: true,
         },
       },
+      select: {
+        discharges_diagnosis: {
+          id: true,
+          code: true,
+          title: true,
+          description: true,
+        },
+      },
       order: { created_at: 'DESC' },
+      take: pagination.limit,
+      skip,
+      cache: {
+        id: cacheKey,
+        milliseconds: 86400000,
+      },
     });
+    return {
+      data: discharges,
+      meta: PaginationMeta({
+        currentCount: discharges.length,
+        queryParams: pagination,
+        totalCount: total,
+      }),
+    };
   }
 
   async findOneDischarge(id: string) {
@@ -353,6 +465,26 @@ export class ClinicalRecordsService {
           admission_diagnosis: true,
         },
         discharges_diagnosis: true,
+      },
+      select: {
+        admission: {
+          admission_diagnosis: {
+            id: true,
+            code: true,
+            title: true,
+            description: true,
+          },
+        },
+        discharges_diagnosis: {
+          id: true,
+          code: true,
+          title: true,
+          description: true,
+        },
+      },
+      cache: {
+        id: `discharge_${id}`,
+        milliseconds: 86400000,
       },
     });
     if (!discharge) {
@@ -397,6 +529,7 @@ export class ClinicalRecordsService {
       }
 
       await queryRunner.commitTransaction();
+      await this.dataSource.queryResultCache?.clear();
       return updateDischarge;
     } catch (error: any) {
       await queryRunner.rollbackTransaction();
@@ -407,7 +540,16 @@ export class ClinicalRecordsService {
   }
 
   async removeDischarge(id: string) {
-    return this.dischargeRepo.delete({
+    const deleteDischarge = await this.dischargeRepo.delete({
+      id,
+    });
+    await this.dataSource.queryResultCache?.clear();
+    return deleteDischarge;
+  }
+
+  async removeDischargeDiagnose(id: string) {
+    await this.dataSource.queryResultCache?.clear();
+    return this.dischargeDiagnosisRepo.delete({
       id,
     });
   }

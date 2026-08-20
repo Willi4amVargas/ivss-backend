@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,11 +10,16 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { PatientsService } from './patients.service';
+import { PaginationQueryParamsDto } from '../utils/pagination/pagination.dto';
+import { SearchType, SearchTypeDto } from './dto/search-type.dto';
+import { FindOneDto, FindOneType } from './dto/findone-type.dto';
+import { isUUID } from 'class-validator';
 
 @ApiTags('patients')
 @Controller('patients')
@@ -50,68 +56,64 @@ export class PatientsController {
     status: 200,
     description: 'Lista de pacientes devuelta exitosamente.',
   })
-  findAll() {
-    return this.patientsService.findAll();
+  findAll(@Query() pagination: PaginationQueryParamsDto) {
+    return this.patientsService.findAll(pagination);
   }
 
   /**
-   * GET /patients/cedula/:cedula
-   * Busca un paciente por su cédula de identidad.
+   * GET /search/:value
+   * Busca un paciente por su cedula, nombre o numero de historia
    */
-  @Get('cedula/:cedula')
-  @ApiOperation({ summary: 'Buscar paciente por cédula' })
+  @Get('search')
+  @ApiOperation({ summary: 'Buscar paciente por un filtro' })
   @ApiResponse({ status: 200, description: 'Paciente encontrado.' })
   @ApiResponse({ status: 404, description: 'Paciente no encontrado.' })
-  findByCedula(@Param('cedula') cedula: string) {
-    return this.patientsService.findByCedula(cedula);
-  }
-
-  /**
-   * GET /patients/cedula/search/:cedula
-   * Busca un paciente por su cédula de identidad.
-   */
-  @Get('cedula/search/:cedula')
-  @ApiOperation({ summary: 'Buscar pacientes por cédula' })
-  @ApiResponse({ status: 200, description: 'Paciente encontrado.' })
-  @ApiResponse({ status: 404, description: 'Paciente no encontrado.' })
-  searchByCedula(@Param('cedula') cedula: string) {
-    return this.patientsService.searchByCedula(cedula);
-  }
-
-  /**
-   * GET /history/:historia
-   * Busca un paciente por su numero de historia
-   */
-  @Get('history/:historia')
-  @ApiOperation({ summary: 'Buscar paciente por cédula' })
-  @ApiResponse({ status: 200, description: 'Paciente encontrado.' })
-  @ApiResponse({ status: 404, description: 'Paciente no encontrado.' })
-  findByHistoryNumber(@Param('historia') historia: string) {
-    return this.patientsService.findByHistoryNumber(historia);
-  }
-
-  /**
-   * GET /history/search/:historia
-   * Busca un paciente por su numero de historia
-   */
-  @Get('history/search/:historia')
-  @ApiOperation({ summary: 'Buscar pacientes por cédula' })
-  @ApiResponse({ status: 200, description: 'Paciente encontrado.' })
-  @ApiResponse({ status: 404, description: 'Paciente no encontrado.' })
-  searchByHistoryNumber(@Param('historia') historia: string) {
-    return this.patientsService.searchByHistoryNumber(historia);
+  searchBy(
+    @Query() searchParams: SearchTypeDto,
+    @Query() pagination: PaginationQueryParamsDto,
+  ) {
+    if (searchParams.type === SearchType.DOCUMENT_ID) {
+      return this.patientsService.searchByCedula(searchParams.q, pagination);
+    } else if (searchParams.type === SearchType.HISTORY_NUMBER) {
+      return this.patientsService.searchByHistoryNumber(
+        searchParams.q,
+        pagination,
+      );
+    } else if (searchParams.type === SearchType.NAME) {
+      return this.patientsService.searchByNamesAndLastNames(
+        searchParams.q,
+        pagination,
+      );
+    }
+    throw new BadRequestException(
+      `"${searchParams.type}" No es valor valido para buscar`,
+    );
   }
 
   /**
    * GET /patients/:id
    * Retorna un paciente por su UUID interno, incluyendo sus historias clínicas.
    */
-  @Get(':id')
+  @Get(':value')
   @ApiOperation({ summary: 'Buscar paciente por ID' })
   @ApiResponse({ status: 200, description: 'Paciente encontrado.' })
   @ApiResponse({ status: 404, description: 'Paciente no encontrado.' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.patientsService.findOne(id);
+  findOne(@Param('value') value: string, @Query() findType: FindOneDto) {
+    if (findType.type === FindOneType.ID) {
+      if (!isUUID(value)) {
+        throw new BadRequestException(
+          'El parámetro proporcionado debe ser un UUID válido',
+        );
+      }
+      return this.patientsService.findOne(value);
+    } else if (findType.type === FindOneType.DOCUMENT_ID) {
+      return this.patientsService.findByCedula(value);
+    } else if (findType.type === FindOneType.HISTORY_NUMBER) {
+      return this.patientsService.findByHistoryNumber(value);
+    }
+    throw new BadRequestException(
+      `"${findType.type}" No es valor valido para buscar`,
+    );
   }
 
   /**

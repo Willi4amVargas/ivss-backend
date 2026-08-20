@@ -4,11 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Like, Repository } from 'typeorm';
+import { DataSource, ILike, Repository } from 'typeorm';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { Patient } from './entities/patient.entity';
 import { HistoryNumber } from './entities/history_number.entity';
+import { PaginationQueryParamsDto } from '../utils/pagination/pagination.dto';
+import { PaginationMeta } from '../utils/pagination/pagination.meta';
 
 @Injectable()
 export class PatientsService {
@@ -52,7 +54,7 @@ export class PatientsService {
       }
 
       await queryRunner.commitTransaction();
-
+      await this.dataSource.queryResultCache?.clear();
       return createdPatient;
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -62,11 +64,19 @@ export class PatientsService {
     }
   }
 
-  async findAll() {
-    const patients = await this.patientRepository.find({
+  async findAll(pagination: PaginationQueryParamsDto) {
+    const skip = pagination.limit * (pagination.page - 1);
+    const cacheKey = `patients_page_${pagination.page}_limit_${pagination.limit}`;
+    const [patients, total] = await this.patientRepository.findAndCount({
       where: { status: true },
       order: { lastnames: 'ASC', names: 'ASC' },
       relations: { history_numbers: true },
+      take: pagination.limit,
+      skip: skip,
+      cache: {
+        id: cacheKey,
+        milliseconds: 86400000,
+      },
     });
     const finalPatients = patients.map((p) => {
       return {
@@ -74,54 +84,94 @@ export class PatientsService {
         history_numbers: p.history_numbers.map((h) => h.history_number),
       };
     });
-    return finalPatients;
+    return {
+      data: finalPatients,
+      meta: PaginationMeta({
+        queryParams: pagination,
+        totalCount: total,
+        currentCount: patients.length,
+      }),
+    };
   }
 
   async findOne(id: string) {
     const patient = await this.patientRepository.findOne({
       where: { id },
       relations: { admissions: true, history_numbers: true },
+      cache: {
+        id: `patient-id-${id}`,
+        milliseconds: 86400000,
+      },
     });
     if (!patient) {
       throw new NotFoundException(
         `Paciente con ID "${id}" no encontrado en el sistema.`,
       );
     }
-    const patientFormat = {
+    return {
       ...patient,
       history_numbers: patient.history_numbers.map((h) => h.history_number),
     };
-    return patientFormat;
   }
 
-  async findByCedula(cedula: string): Promise<Patient> {
+  async findByCedula(cedula: string) {
     const patient = await this.patientRepository.findOne({
       where: { document_id: cedula },
       relations: { admissions: true, history_numbers: true },
+      cache: {
+        id: `patient-documentId-${cedula}`,
+        milliseconds: 86400000,
+      },
     });
     if (!patient) {
       throw new NotFoundException(
         `Paciente con cédula "${cedula}" no encontrado en el sistema.`,
       );
     }
-    return patient;
+    return {
+      ...patient,
+      history_numbers: patient.history_numbers.map((h) => h.history_number),
+    };
   }
 
-  async searchByCedula(cedula: string): Promise<Patient[]> {
-    const patients = await this.patientRepository.find({
+  async searchByCedula(cedula: string, pagination: PaginationQueryParamsDto) {
+    const skip = pagination.limit * (pagination.page - 1);
+    const cacheKey = `patients_page_${pagination.page}_limit_${pagination.limit}_documentId_${cedula}`;
+    const [patients, total] = await this.patientRepository.findAndCount({
       where: {
-        document_id: Like(`%${cedula}%`),
+        document_id: ILike(`%${cedula}%`),
         status: true,
       },
       relations: { history_numbers: true },
       order: { lastnames: 'ASC', names: 'ASC' },
+      take: pagination.limit,
+      skip: skip,
+      cache: {
+        id: cacheKey,
+        milliseconds: 86400000,
+      },
     });
     if (!patients || patients.length === 0) {
       throw new NotFoundException(
         `No se encontraron pacientes con la cédula similar a "${cedula}".`,
       );
     }
-    return patients;
+
+    const finalPatients = patients.map((p) => {
+      return {
+        ...p,
+        history_numbers: p.history_numbers.map((h) => h.history_number),
+      };
+    });
+
+    return {
+      data: finalPatients,
+      meta: PaginationMeta({
+        queryParams: pagination,
+        totalCount: total,
+        currentCount: patients.length,
+      }),
+    };
   }
 
   async findByHistoryNumber(historia: string) {
@@ -134,24 +184,42 @@ export class PatientsService {
       relations: {
         history_numbers: true,
       },
+      cache: {
+        id: `patient-historyNumber-${historia}`,
+        milliseconds: 86400000,
+      },
     });
     if (!patient) {
       throw new NotFoundException(
         `Paciente con numero de historia "${historia}" no encontrado en el sistema.`,
       );
     }
-    return patient;
+    return {
+      ...patient,
+      history_numbers: patient.history_numbers.map((h) => h.history_number),
+    };
   }
 
-  async searchByHistoryNumber(historia: string) {
-    const patients = await this.patientRepository.find({
+  async searchByHistoryNumber(
+    historia: string,
+    pagination: PaginationQueryParamsDto,
+  ) {
+    const skip = pagination.limit * (pagination.page - 1);
+    const cacheKey = `patients_page_${pagination.page}_limit_${pagination.limit}_historyNumber_${historia}`;
+    const [patients, total] = await this.patientRepository.findAndCount({
       where: {
         history_numbers: {
-          history_number: Like(`%${historia}%`),
+          history_number: ILike(`%${historia}%`),
         },
       },
       relations: {
         history_numbers: true,
+      },
+      take: pagination.limit,
+      skip: skip,
+      cache: {
+        id: cacheKey,
+        milliseconds: 86400000,
       },
     });
     if (!patients || patients.length === 0) {
@@ -159,7 +227,69 @@ export class PatientsService {
         `No se encontraron pacientes con numero de historia similar a "${historia}".`,
       );
     }
-    return patients;
+
+    const finalPatients = patients.map((p) => {
+      return {
+        ...p,
+        history_numbers: p.history_numbers.map((h) => h.history_number),
+      };
+    });
+    return {
+      data: finalPatients,
+      meta: PaginationMeta({
+        queryParams: pagination,
+        totalCount: total,
+        currentCount: patients.length,
+      }),
+    };
+  }
+
+  async searchByNamesAndLastNames(
+    value: string,
+    pagination: PaginationQueryParamsDto,
+  ) {
+    const skip = pagination.limit * (pagination.page - 1);
+    const cacheKey = `patients_page_${pagination.page}_limit_${pagination.limit}_namesLastnames_${value}`;
+    const [patients, total] = await this.patientRepository.findAndCount({
+      where: [
+        {
+          lastnames: ILike(`%${value}%`),
+          status: true,
+        },
+        {
+          names: ILike(`%${value}%`),
+          status: true,
+        },
+      ],
+      relations: { history_numbers: true },
+      order: { lastnames: 'ASC', names: 'ASC' },
+      take: pagination.limit,
+      skip: skip,
+      cache: {
+        id: cacheKey,
+        milliseconds: 86400000,
+      },
+    });
+    if (!patients || patients.length === 0) {
+      throw new NotFoundException(
+        `No se encontraron pacientes con nombres o apellidos similar a "${value}".`,
+      );
+    }
+
+    const finalPatients = patients.map((p) => {
+      return {
+        ...p,
+        history_numbers: p.history_numbers.map((h) => h.history_number),
+      };
+    });
+    return {
+      data: finalPatients,
+      meta: PaginationMeta({
+        queryParams: pagination,
+        totalCount: total,
+        currentCount: patients.length,
+      }),
+    };
   }
 
   async update(id: string, dto: UpdatePatientDto) {
@@ -215,6 +345,7 @@ export class PatientsService {
         }
       }
 
+      await this.dataSource.queryResultCache?.clear();
       await queryRunner.commitTransaction();
       return updatedPatient;
     } catch (error) {
@@ -226,34 +357,29 @@ export class PatientsService {
   }
 
   async remove(id: string): Promise<void> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
     try {
-      const patient = await queryRunner.manager.findOne(Patient, {
-        where: { id },
-      });
-      if (!patient) {
-        new NotFoundException(`No se encontraron pacientes con el id "${id}".`);
-      }
-      await queryRunner.manager.update(Patient, { id }, { status: false });
-      await queryRunner.commitTransaction();
-      return;
+      await this.patientRepository.update(
+        {
+          id,
+        },
+        {
+          status: false,
+        },
+      );
+      await this.dataSource.queryResultCache?.clear();
     } catch (error) {
-      await queryRunner.rollbackTransaction();
       throw error;
-    } finally {
-      await queryRunner.release();
     }
   }
 
   async removeHistoryNumber(id: string, history: string) {
     try {
-      const removeHistory = await this.historyNumberRepository.delete({
+      await this.historyNumberRepository.delete({
         patient_id: id,
         history_number: history,
       });
-      return removeHistory;
+      await this.dataSource.queryResultCache?.clear();
+      return;
     } catch (error) {
       throw error;
     }

@@ -20,6 +20,8 @@ import { CreateDischargeDto, UpdateDischargeDto } from './dto/discharge.dto';
 import { PatientsService } from '../patients/patients.service';
 import { PaginationQueryParamsDto } from '../utils/pagination/pagination.dto';
 import { PaginationMeta } from '../utils/pagination/pagination.meta';
+import { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
+import { FilesService } from '../files/files.service';
 
 @Injectable()
 export class ClinicalRecordsService {
@@ -36,6 +38,7 @@ export class ClinicalRecordsService {
     @InjectRepository(DischargeDiagnosis)
     private readonly dischargeDiagnosisRepo: Repository<DischargeDiagnosis>,
     private readonly patientsService: PatientsService,
+    private readonly filesService: FilesService,
   ) {}
 
   // --- Admission & Admission Diagnosis ---
@@ -306,6 +309,267 @@ export class ClinicalRecordsService {
     });
   }
 
+  private async getAdmissionPdfDefinition(
+    admission: Admission,
+    evolutions: HospitalEvolution[],
+  ): Promise<TDocumentDefinitions> {
+    // Formatear datos del paciente
+    const patientName = admission.patient
+      ? `${admission.patient.names} ${admission.patient.lastnames}`.toUpperCase()
+      : 'N/A';
+    const patientDoc = admission.patient.document_id || 'N/A';
+    const patientGender = admission.patient.gender || 'N/A';
+
+    // Calcular edad si están los campos de nacimiento
+    let patientAge = 'N/A';
+    if (admission.patient?.birth_year) {
+      const birthDate = new Date(
+        admission.patient.birth_year,
+        (admission.patient.birth_month || 1) - 1,
+        admission.patient.birth_day || 1,
+      );
+      const ageDifMs = Date.now() - birthDate.getTime();
+      const ageDate = new Date(ageDifMs);
+      patientAge = `${Math.abs(ageDate.getUTCFullYear() - 1970)} AÑOS`;
+    }
+
+    // Motivo de consulta
+    const consultReasons = admission.consult_reason.join(', ') || 'N/A';
+
+    // Antecedentes
+    const backgroundText =
+      admission.background.join(', ') || 'SIN ANTECEDENTES RELEVANTES';
+
+    // Diagnósticos de ingreso
+    const diagnosesList: Content = admission.admission_diagnosis.map(
+      (diag: AdmissionDiagnosis, index: number) => ({
+        text: [
+          { text: `${index + 1}.  ` },
+          { text: diag.code, bold: true },
+          { text: ` - ${diag.title || diag.description}` },
+        ],
+        margin: [0, 2, 0, 2],
+      }),
+    );
+
+    const evolutionList: Content = evolutions.map((e, index) => ({
+      text: [
+        { text: `${index + 1}.  ` },
+        {
+          text: new Date(e.created_at).toLocaleString('es-VE', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          }),
+          bold: true,
+        },
+        { text: ` - ${e.description}` },
+      ],
+      margin: [0, 2, 0, 2],
+    }));
+
+    return {
+      pageSize: 'LETTER',
+      pageMargins: [40, 30, 40, 50],
+      background: function (currentPage, pageSize) {
+        return [
+          {
+            // Si tienes la imagen en Base64
+            image: 'assets/background.jpg',
+            width: 300,
+            opacity: 0.1, // Controla la transparencia (0.1 = 10%)
+            absolutePosition: {
+              x: (pageSize.width - 300) / 2, // Centrado horizontalmente
+              y: (pageSize.height - 300) / 2, // Centrado verticalmente
+            },
+          },
+        ];
+      },
+      content: [
+        // ENCABEZADO CON LOGOS Y TÍTULO INSTITUCIONAL
+        {
+          columns: [
+            {
+              image: 'assets/left.jpg',
+              fontSize: 8,
+              alignment: 'center',
+              width: 70,
+            },
+            {
+              width: '*',
+              text: [
+                {
+                  text: 'MINISTERIO DEL PODER POPULAR PARA LA SALUD\n',
+                  fontSize: 10,
+                  bold: true,
+                },
+                {
+                  text: 'INSTITUTO VENEZOLANO DE LOS SEGUROS SOCIALES\n',
+                  fontSize: 10,
+                  bold: true,
+                },
+                {
+                  text: 'HOSPITAL Dr. "PATROCINIO PEÑUELA RUIZ"\n',
+                  fontSize: 10,
+                  bold: true,
+                },
+                {
+                  text: 'SAN CRISTOBAL - EDO TACHIRA\n',
+                  fontSize: 10,
+                  bold: true,
+                },
+                {
+                  text: 'POSTGRADO DE MEDICINA INTERNA\n',
+                  fontSize: 10,
+                  bold: true,
+                },
+              ],
+              alignment: 'center',
+            },
+            {
+              image: 'assets/right.jpg',
+              fontSize: 8,
+              alignment: 'center',
+              width: 70,
+            },
+          ],
+          margin: [0, 0, 0, 15],
+        },
+
+        {
+          text: 'RESUMEN DE INGRESO',
+          fontSize: 11,
+          bold: true,
+          alignment: 'center',
+          margin: [0, 0, 0, 15],
+        },
+        // DATOS FILIATORIOS DEL PACIENTE
+        {
+          style: 'sectionBlock',
+          text: [
+            { text: 'PACIENTE: ', bold: true },
+            `${patientName}    `,
+            { text: 'C.I: ', bold: true },
+            `${patientDoc}    `,
+            { text: 'GÉNERO: ', bold: true },
+            `${patientGender}    `,
+            { text: 'EDAD: ', bold: true },
+            `${patientAge}\n`,
+            { text: 'FECHA DE INGRESO: ', bold: true },
+            `${
+              admission.admission_date
+                ? new Date(admission.admission_date).toLocaleString('es-VE', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true,
+                  })
+                : 'N/A'
+            }`,
+          ],
+        },
+
+        // MOTIVO DE CONSULTA Y ENFERMEDAD ACTUAL
+        {
+          style: 'sectionBlock',
+          text: [
+            { text: 'MOTIVO DE CONSULTA: ', bold: true },
+            `${consultReasons}\n\n`,
+            { text: 'ENFERMEDAD ACTUAL: ', bold: true },
+            `${admission.current_condition || 'N/A'}`,
+          ],
+        },
+
+        // ANTECEDENTES
+        {
+          style: 'sectionBlock',
+          text: [{ text: 'ANTECEDENTES: ', bold: true }, `${backgroundText}`],
+        },
+
+        // EXAMEN FÍSICO / EXAMEN DE INGRESO
+        {
+          style: 'sectionBlock',
+          text: [
+            { text: 'EXAMEN FÍSICO DE INGRESO: ', bold: true },
+            `${admission.admission_exam || 'N/A'}`,
+          ],
+        },
+
+        // DIAGNÓSTICO DE INGRESO
+        {
+          text: 'DIAGNÓSTICO DE INGRESO:',
+          bold: true,
+          fontSize: 9.5,
+          margin: [0, 10, 0, 4],
+        },
+        ...diagnosesList,
+        {
+          text: 'EVOLUCIÓN INTRAHOSPITALARIA:',
+          bold: true,
+          fontSize: 9.5,
+          margin: [0, 10, 0, 4],
+        },
+        ...evolutionList,
+      ],
+
+      // PIE DE PÁGINA FIXTURE (Como en la foto)
+      footer: (currentPage, pageCount) => {
+        return {
+          columns: [
+            {
+              width: '*',
+              text: [
+                {
+                  text: 'POSTGRADO DE MEDICINA INTERNA\n',
+                  bold: true,
+                  fontSize: 10,
+                },
+                {
+                  text: 'Dirección: Via Principal de Santa Teresa I.V.S.S. San Cristóbal - Edo. Táchira\n',
+                  fontSize: 9,
+                },
+                { text: 'Teléfono: (0276) 3435035', fontSize: 9 },
+              ],
+              alignment: 'center',
+            },
+          ],
+          margin: [40, 0, 40, 0],
+        };
+      },
+
+      styles: {
+        sectionBlock: {
+          fontSize: 9,
+          alignment: 'justify',
+          lineHeight: 1.15,
+          margin: [0, 0, 0, 10],
+        },
+      },
+      defaultStyle: {
+        font: 'Roboto',
+        fontSize: 9,
+      },
+    };
+  }
+
+  async getAdmissionPdf(id: string) {
+    const admission = await this.findOneAdmission(id);
+    const admissionEvolutions = await this.findAllEvolutions(id);
+    const admissionDocumentDefinition = await this.getAdmissionPdfDefinition(
+      admission,
+      admissionEvolutions,
+    );
+    const pdfAdmission = await this.filesService.pdf(
+      admissionDocumentDefinition,
+    );
+    return pdfAdmission;
+  }
+
   // --- Hospital Evolution ---
   async createEvolution(dto: CreateHospitalEvolutionDto) {
     await this.findOneAdmission(dto.admission_id);
@@ -552,5 +816,101 @@ export class ClinicalRecordsService {
     return this.dischargeDiagnosisRepo.delete({
       id,
     });
+  }
+
+  private async getDischargePdfDefinition(
+    discharge: Discharges,
+  ): Promise<TDocumentDefinitions> {
+    const admission = await this.findOneAdmission(discharge.admission_id);
+    const admissionEvolutions = await this.findAllEvolutions(
+      discharge.admission_id,
+    );
+    const { content, ...admissionPdfDefinion } =
+      await this.getAdmissionPdfDefinition(admission, admissionEvolutions);
+
+    const contentArray: Content[] = Array.isArray(content)
+      ? content
+      : [content];
+
+    const dischargeList: Content[] = discharge.discharges_diagnosis.map(
+      (diag: DischargeDiagnosis, index: number) => ({
+        text: [
+          { text: `${index + 1}.  ` },
+          { text: diag.code, bold: true },
+          { text: ` - ${diag.title || diag.description}` },
+        ],
+        margin: [0, 2, 0, 2],
+      }),
+    );
+
+    return {
+      ...admissionPdfDefinion,
+      content: [
+        ...contentArray,
+        {
+          text: 'RESUMEN DE EGRESO',
+          fontSize: 11,
+          bold: true,
+          alignment: 'center',
+          margin: [0, 0, 0, 15],
+        },
+        {
+          style: 'sectionBlock',
+          text: [
+            { text: 'FECHA DE EGRESO: ', bold: true },
+            `${
+              discharge.discharge_date
+                ? new Date(discharge.discharge_date).toLocaleString('es-VE', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true,
+                  })
+                : 'N/A'
+            }`,
+            '\n',
+            {
+              text: `${discharge.morbility_status ? 'FALLECIDO' : ''}`,
+              bold: true,
+            },
+          ],
+        },
+        {
+          style: 'sectionBlock',
+          text: [
+            { text: 'EXAMEN FÍSICO DE EGRESO: ', bold: true },
+            `${discharge.discharge_exam || 'N/A'}`,
+          ],
+        },
+
+        {
+          text: 'DIAGNÓSTICO DE EGRESO:',
+          bold: true,
+          fontSize: 9.5,
+          margin: [0, 10, 0, 4],
+        },
+        ...dischargeList,
+        {
+          style: 'sectionBlock',
+          margin: [0, 12, 0, 0],
+          text: [
+            { text: 'TRATAMIENTO: ', bold: true },
+            `${discharge.treatment_plan || 'N/A'}`,
+          ],
+        },
+      ],
+    };
+  }
+
+  async getDischargePdf(id: string) {
+    const discharge = await this.findOneDischarge(id);
+    const admissionDocumentDefinition =
+      await this.getDischargePdfDefinition(discharge);
+    const pdfAdmission = await this.filesService.pdf(
+      admissionDocumentDefinition,
+    );
+    return pdfAdmission;
   }
 }

@@ -8,6 +8,7 @@ import { AdmissionDiagnosis } from './entities/admission_diagnosis.entity';
 import { HospitalEvolution } from './entities/hospital_evolution.entity';
 import { Discharges } from './entities/discharges.entity';
 import { DischargeDiagnosis } from './entities/discharges_diagnosis.entity';
+import { FilesService } from '../files/files.service';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { DischargeDiagnosis } from './entities/discharges_diagnosis.entity';
     PatientsModule,
   ],
   controllers: [ClinicalRecordsController],
-  providers: [ClinicalRecordsService],
+  providers: [ClinicalRecordsService, FilesService],
   exports: [ClinicalRecordsService],
 })
 export class ClinicalRecordsModule {}

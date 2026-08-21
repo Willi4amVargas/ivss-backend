@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -11,6 +10,7 @@ import {
   Patch,
   Post,
   Query,
+  StreamableFile,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { ClinicalRecordsService } from './clinical-records.service';
@@ -51,6 +51,16 @@ export class ClinicalRecordsController {
     } else {
       return this.clinicalRecordsService.findAllAdmissions(true, pagination);
     }
+  }
+
+  @Get('admissions/:id/document')
+  @ApiOperation({ summary: 'Get admission document' })
+  async admissionDocument(@Param('id', ParseUUIDPipe) id: string) {
+    const pdfAdmission = await this.clinicalRecordsService.getAdmissionPdf(id);
+    return new StreamableFile(pdfAdmission, {
+      type: 'application/pdf',
+      disposition: `inline; filename="admission_${id}.pdf"`,
+    });
   }
 
   @Get('admissions/:id')
@@ -132,6 +142,16 @@ export class ClinicalRecordsController {
   @ApiOperation({ summary: 'Get all discharges' })
   findAllDischarges(@Query() pagination: PaginationQueryParamsDto) {
     return this.clinicalRecordsService.findAllDischarges(pagination);
+  }
+
+  @Get('discharges/:id/document')
+  @ApiOperation({ summary: 'Get discharge document' })
+  async dischargeDocument(@Param('id', ParseUUIDPipe) id: string) {
+    const pdfDischarge = await this.clinicalRecordsService.getDischargePdf(id);
+    return new StreamableFile(pdfDischarge, {
+      type: 'application/pdf',
+      disposition: `inline; filename="discharge_${id}.pdf"`,
+    });
   }
 
   @Get('discharges/:id')

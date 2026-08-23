@@ -99,6 +99,7 @@ export class CreatePatientDto {
     example: 'Barrio obrero...',
   })
   @IsString()
+  @IsOptional()
   @MaxLength(200)
   @Transform(ToUpperCaseString)
   address: string;

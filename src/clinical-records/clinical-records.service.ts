@@ -42,7 +42,7 @@ export class ClinicalRecordsService {
   ) {}
 
   // --- Admission & Admission Diagnosis ---
-  async createAdmission(dto: CreateAdmissionDto) {
+  async createAdmission(dto: CreateAdmissionDto, user_id: string) {
     // Validate patient exists
     const patientExist = await this.patientsService.findOne(dto.patient_id);
 
@@ -86,6 +86,7 @@ export class ClinicalRecordsService {
         current_condition: dto.current_condition,
         background: dto.background,
         admission_exam: dto.admission_exam,
+        created_by: user_id,
       });
       const savedAdmission = await queryRunner.manager.save(
         Admission,
@@ -196,6 +197,7 @@ export class ClinicalRecordsService {
         discharge: {
           discharges_diagnosis: true,
         },
+        user: true,
       },
       select: {
         admission_diagnosis: {
@@ -217,6 +219,9 @@ export class ClinicalRecordsService {
             title: true,
             description: true,
           },
+        },
+        user: {
+          description: true,
         },
       },
       cache: {
@@ -244,7 +249,6 @@ export class ClinicalRecordsService {
         background: admissionData.background,
         consult_reason: admissionData.consult_reason,
         current_condition: admissionData.current_condition,
-        updated_at: new Date(),
       });
 
       if (diagnoses) {
@@ -571,12 +575,13 @@ export class ClinicalRecordsService {
   }
 
   // --- Hospital Evolution ---
-  async createEvolution(dto: CreateHospitalEvolutionDto) {
+  async createEvolution(dto: CreateHospitalEvolutionDto, user_id: string) {
     await this.findOneAdmission(dto.admission_id);
 
     const evolution = this.evolutionRepo.create({
       admission_id: dto.admission_id,
       description: dto.description,
+      created_by: user_id,
     });
     const savedEvolution = await this.evolutionRepo.save(evolution);
     await this.dataSource.queryResultCache?.clear();
@@ -586,6 +591,12 @@ export class ClinicalRecordsService {
   async findAllEvolutions(admissionId: string): Promise<HospitalEvolution[]> {
     return this.evolutionRepo.find({
       where: { admission_id: admissionId },
+      relations: { user: true },
+      select: {
+        user: {
+          description: true,
+        },
+      },
       order: { created_at: 'ASC' },
       cache: {
         id: `admission_evolutions_${admissionId}`,
@@ -598,6 +609,12 @@ export class ClinicalRecordsService {
     const evolution = await this.evolutionRepo.findOne({
       where: { id },
       cache: { id: `evolution_${id}`, milliseconds: 86400000 },
+      relations: { user: true },
+      select: {
+        user: {
+          description: true,
+        },
+      },
     });
     if (!evolution) {
       throw new NotFoundException(`Evolution with ID ${id} not found`);
@@ -622,7 +639,7 @@ export class ClinicalRecordsService {
   }
 
   // --- Discharge & Discharge Diagnosis ---
-  async createDischarge(dto: CreateDischargeDto) {
+  async createDischarge(dto: CreateDischargeDto, user_id: string) {
     const admission = await this.findOneAdmission(dto.admission_id);
 
     // la fecha del alta no puede ser menor a la fecha de ingreso
@@ -653,6 +670,7 @@ export class ClinicalRecordsService {
         discharge_exam: dto.discharge_exam,
         morbility_status: dto.morbility_status,
         treatment_plan: dto.treatment_plan,
+        created_by: user_id,
       });
       const saveDischarge = await queryRunner.manager.save(discharge);
 
@@ -729,8 +747,12 @@ export class ClinicalRecordsService {
           admission_diagnosis: true,
         },
         discharges_diagnosis: true,
+        user: true,
       },
       select: {
+        user: {
+          description: true,
+        },
         admission: {
           admission_diagnosis: {
             id: true,

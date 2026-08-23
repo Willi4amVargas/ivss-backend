@@ -1,5 +1,6 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -7,10 +8,12 @@ import {
   OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { Patient } from '../../patients/entities/patient.entity';
 import { AdmissionDiagnosis } from './admission_diagnosis.entity';
 import { Discharges } from './discharges.entity';
+import { User } from '../../users/entities/user.entity';
 
 @Entity({ name: 'admission' })
 export class Admission {
@@ -55,19 +58,18 @@ export class Admission {
   })
   admission_exam: string;
 
-  @Column({
-    name: 'created_at',
-    type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-  })
+  @CreateDateColumn({ type: 'timestamp', name: 'created_at' })
   created_at: Date;
 
-  @Column({
-    name: 'updated_at',
-    type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-  })
+  @UpdateDateColumn({ type: 'timestamp', name: 'updated_at' })
   updated_at: Date;
+
+  @Column({ type: 'uuid', name: 'created_by' })
+  created_by: string;
+
+  @ManyToOne(() => User, (user) => user.discharges, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'created_by' })
+  user: User;
 
   @ManyToOne(() => Patient, (patient) => patient.admissions, {
     nullable: false,

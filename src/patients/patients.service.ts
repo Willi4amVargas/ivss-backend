@@ -22,7 +22,7 @@ export class PatientsService {
     private readonly historyNumberRepository: Repository<HistoryNumber>,
   ) {}
 
-  async create(dto: CreatePatientDto): Promise<Patient> {
+  async create(dto: CreatePatientDto, user_id: string): Promise<Patient> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -39,7 +39,18 @@ export class PatientsService {
 
       const { history_numbers, ...otherDto } = dto;
 
-      const patient = queryRunner.manager.create(Patient, otherDto);
+      const patient = queryRunner.manager.create(Patient, {
+        document_id: otherDto.document_id,
+        names: otherDto.names,
+        lastnames: otherDto.lastnames,
+        address: otherDto.address,
+        gender: otherDto.gender,
+        birth_year: otherDto.birth_year,
+        birth_month: otherDto.birth_day,
+        birth_day: otherDto.birth_day,
+        status: otherDto.status,
+        created_by: user_id,
+      });
       const createdPatient = await queryRunner.manager.save(patient);
 
       if (history_numbers && history_numbers.length > 0) {
@@ -327,7 +338,6 @@ export class PatientsService {
         birth_year: dto.birth_year,
         birth_month: dto.birth_month,
         status: dto.status,
-        updated_at: new Date(),
       });
 
       if (dto.history_numbers) {

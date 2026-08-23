@@ -7,6 +7,10 @@ import { ClinicalRecordsModule } from './clinical-records/clinical-records.modul
 import { IcdApiModule } from './icd-api/icd-api.module';
 import { PatientsModule } from './patients/patients.module';
 import { StatisticsModule } from './statistics/statistics.module';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { ProfileModule } from './profile/profile.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -60,10 +64,14 @@ import { StatisticsModule } from './statistics/statistics.module';
     }),
 
     // ─── Módulos de negocio ─────────────────────────────────────────────
+    MailModule,
     PatientsModule,
     ClinicalRecordsModule,
     IcdApiModule,
     StatisticsModule,
+    ProfileModule,
+    UsersModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

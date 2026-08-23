@@ -21,6 +21,8 @@ import {
 } from './dto/hospital-evolution.dto';
 import { CreateDischargeDto, UpdateDischargeDto } from './dto/discharge.dto';
 import { PaginationQueryParamsDto } from '../utils/pagination/pagination.dto';
+import { ActiveUser } from '../users/users.decorator';
+import { User } from '../users/entities/user.entity';
 
 @ApiTags('clinical-records')
 @Controller('clinical-records')
@@ -35,8 +37,8 @@ export class ClinicalRecordsController {
   @ApiOperation({ summary: 'Create a new admission' })
   @ApiResponse({ status: 201, description: 'Admission created successfully.' })
   @HttpCode(HttpStatus.CREATED)
-  createAdmission(@Body() dto: CreateAdmissionDto) {
-    return this.clinicalRecordsService.createAdmission(dto);
+  createAdmission(@Body() dto: CreateAdmissionDto, @ActiveUser() user: User) {
+    return this.clinicalRecordsService.createAdmission(dto, user.id);
   }
 
   @Get('admissions')
@@ -97,8 +99,11 @@ export class ClinicalRecordsController {
   @Post('evolutions')
   @ApiOperation({ summary: 'Create a hospital evolution note' })
   @HttpCode(HttpStatus.CREATED)
-  createEvolution(@Body() dto: CreateHospitalEvolutionDto) {
-    return this.clinicalRecordsService.createEvolution(dto);
+  createEvolution(
+    @Body() dto: CreateHospitalEvolutionDto,
+    @ActiveUser() user: User,
+  ) {
+    return this.clinicalRecordsService.createEvolution(dto, user.id);
   }
 
   @Get('evolutions/admissions/:admissionId')
@@ -134,8 +139,8 @@ export class ClinicalRecordsController {
   @Post('discharges')
   @ApiOperation({ summary: 'Create a new discharge' })
   @HttpCode(HttpStatus.CREATED)
-  createDischarge(@Body() dto: CreateDischargeDto) {
-    return this.clinicalRecordsService.createDischarge(dto);
+  createDischarge(@Body() dto: CreateDischargeDto, @ActiveUser() user: User) {
+    return this.clinicalRecordsService.createDischarge(dto, user.id);
   }
 
   @Get('discharges')

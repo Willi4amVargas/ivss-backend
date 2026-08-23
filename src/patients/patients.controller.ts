@@ -20,6 +20,8 @@ import { PaginationQueryParamsDto } from '../utils/pagination/pagination.dto';
 import { SearchType, SearchTypeDto } from './dto/search-type.dto';
 import { FindOneDto, FindOneType } from './dto/findone-type.dto';
 import { isUUID } from 'class-validator';
+import { ActiveUser } from '../users/users.decorator';
+import { User } from '../users/entities/user.entity';
 
 @ApiTags('patients')
 @Controller('patients')
@@ -42,8 +44,8 @@ export class PatientsController {
     description: 'La cédula o el número de historia ya existen.',
   })
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() dto: CreatePatientDto) {
-    return this.patientsService.create(dto);
+  create(@Body() dto: CreatePatientDto, @ActiveUser() user: User) {
+    return this.patientsService.create(dto, user.id);
   }
 
   /**

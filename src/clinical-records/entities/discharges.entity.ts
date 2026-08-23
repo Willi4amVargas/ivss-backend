@@ -1,14 +1,18 @@
 import { Admission } from './admission.entity';
 import {
   Column,
+  CreateDateColumn,
   Entity,
   Index,
   JoinColumn,
+  ManyToOne,
   OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { DischargeDiagnosis } from './discharges_diagnosis.entity';
+import { User } from '../../users/entities/user.entity';
 
 @Entity({ name: 'discharge' })
 export class Discharges {
@@ -49,19 +53,18 @@ export class Discharges {
   })
   treatment_plan: string;
 
-  @Column({
-    name: 'created_at',
-    type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-  })
+  @CreateDateColumn({ type: 'timestamp', name: 'created_at' })
   created_at: Date;
 
-  @Column({
-    name: 'updated_at',
-    type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-  })
+  @UpdateDateColumn({ type: 'timestamp', name: 'updated_at' })
   updated_at: Date;
+
+  @Column({ type: 'uuid', name: 'created_by' })
+  created_by: string;
+
+  @ManyToOne(() => User, (user) => user.discharges, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'created_by' })
+  user: User;
 
   @OneToOne(() => Admission)
   @JoinColumn({ name: 'admission_id' })

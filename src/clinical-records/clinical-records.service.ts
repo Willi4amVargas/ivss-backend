@@ -5,7 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In, IsNull, FindManyOptions } from 'typeorm';
+import {
+  Repository,
+  DataSource,
+  In,
+  IsNull,
+  FindManyOptions,
+  FindOptionsWhere,
+} from 'typeorm';
 import { Admission } from './entities/admission.entity';
 import { AdmissionDiagnosis } from './entities/admission_diagnosis.entity';
 import { HospitalEvolution } from './entities/hospital_evolution.entity';
@@ -22,6 +29,7 @@ import { PaginationQueryParamsDto } from '../utils/pagination/pagination.dto';
 import { PaginationMeta } from '../utils/pagination/pagination.meta';
 import { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
 import { FilesService } from '../files/files.service';
+import e from 'express';
 
 @Injectable()
 export class ClinicalRecordsService {
@@ -119,63 +127,41 @@ export class ClinicalRecordsService {
   }
 
   async findAllAdmissions(
-    status: boolean = false,
+    where: FindOptionsWhere<Admission> | undefined = undefined,
     pagination: PaginationQueryParamsDto,
   ) {
     const skip = pagination.limit * (pagination.page - 1);
-    const cacheKey = `admissions_page_${pagination.page}_limit_${pagination.limit}_status_${status}`;
-    const findManyOptions: FindManyOptions<Admission> = status
-      ? {
-          relations: {
-            patient: true,
-            admission_diagnosis: true,
-            discharge: true,
-          },
-          select: {
-            admission_diagnosis: {
-              id: true,
-              code: true,
-              title: true,
-              description: true,
-            },
-          },
-          order: { created_at: 'DESC' },
-          take: pagination.limit,
-          skip: skip,
-          cache: {
-            id: cacheKey,
-            milliseconds: 86400000,
-          },
-        }
-      : {
-          relations: {
-            patient: true,
-            admission_diagnosis: true,
-            discharge: true,
-          },
-          select: {
-            admission_diagnosis: {
-              id: true,
-              code: true,
-              title: true,
-              description: true,
-            },
-          },
-          where: {
-            discharge: {
-              id: IsNull(),
-            },
-          },
-          order: { created_at: 'DESC' },
-          take: pagination.limit,
-          skip: skip,
-          cache: {
-            id: cacheKey,
-            milliseconds: 86400000,
-          },
-        };
+    const whereKey = where
+      ? Object.entries(where)
+          .map(
+            ([key, value]) =>
+              `${key}:${typeof value === 'object' ? JSON.stringify(value) : value}`,
+          )
+          .join('_')
+      : '';
+    const cacheKey = `admissions_page_${pagination.page}_limit_${pagination.limit}${whereKey !== '' ? `_${whereKey}` : ''}`;
     const [admissions, total] = await this.admissionRepo.findAndCount({
-      ...findManyOptions,
+      relations: {
+        patient: true,
+        admission_diagnosis: true,
+        discharge: true,
+      },
+      where,
+      select: {
+        admission_diagnosis: {
+          id: true,
+          code: true,
+          title: true,
+          description: true,
+        },
+      },
+      order: { created_at: 'DESC' },
+      take: pagination.limit,
+      skip: skip,
+      cache: {
+        id: cacheKey,
+        milliseconds: 86400000,
+      },
     });
 
     return {
@@ -360,7 +346,7 @@ export class ClinicalRecordsService {
       text: [
         { text: `${index + 1}.  ` },
         {
-          text: new Date(e.created_at).toLocaleString('es-VE', {
+          text: new Date(e.date).toLocaleString('es-VE', {
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
@@ -582,6 +568,7 @@ export class ClinicalRecordsService {
       admission_id: dto.admission_id,
       description: dto.description,
       created_by: user_id,
+      date: dto.date,
     });
     const savedEvolution = await this.evolutionRepo.save(evolution);
     await this.dataSource.queryResultCache?.clear();
@@ -597,7 +584,7 @@ export class ClinicalRecordsService {
           description: true,
         },
       },
-      order: { created_at: 'ASC' },
+      order: { date: 'ASC' },
       cache: {
         id: `admission_evolutions_${admissionId}`,
         milliseconds: 86400000,

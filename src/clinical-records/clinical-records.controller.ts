@@ -23,6 +23,8 @@ import { CreateDischargeDto, UpdateDischargeDto } from './dto/discharge.dto';
 import { PaginationQueryParamsDto } from '../utils/pagination/pagination.dto';
 import { ActiveUser } from '../users/users.decorator';
 import { User } from '../users/entities/user.entity';
+import { FindOptionsWhere, IsNull } from 'typeorm';
+import { Admission } from './entities/admission.entity';
 
 @ApiTags('clinical-records')
 @Controller('clinical-records')
@@ -44,15 +46,42 @@ export class ClinicalRecordsController {
   @Get('admissions')
   @ApiOperation({ summary: 'Get all admissions' })
   @ApiQuery({ name: 'status', required: false, enum: ['active'] })
+  @ApiQuery({ name: 'byUser', required: false, enum: ['active'] })
   findAllAdmissions(
     @Query() pagination: PaginationQueryParamsDto,
+    @ActiveUser() activeUser: User,
     @Query('status') status?: string,
+    @Query('byUser') byUser?: string,
   ) {
+    let whereCondition: FindOptionsWhere<Admission> | undefined = undefined;
+
     if (status === 'active') {
-      return this.clinicalRecordsService.findAllAdmissions(false, pagination);
-    } else {
-      return this.clinicalRecordsService.findAllAdmissions(true, pagination);
+      whereCondition = {
+        discharge: {
+          id: IsNull(),
+        },
+      };
     }
+    if (byUser === 'active') {
+      whereCondition =
+        whereCondition === undefined
+          ? {
+              user: {
+                id: activeUser.id,
+              },
+            }
+          : {
+              ...whereCondition,
+              user: {
+                id: activeUser.id,
+              },
+            };
+    }
+
+    return this.clinicalRecordsService.findAllAdmissions(
+      whereCondition,
+      pagination,
+    );
   }
 
   @Get('admissions/:id/document')

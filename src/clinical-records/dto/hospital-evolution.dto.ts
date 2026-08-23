@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsDateString,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { ToUpperCaseString } from '../../utils/transforms/to-uppercase.transform';
@@ -22,6 +28,14 @@ export class CreateHospitalEvolutionDto {
   @IsNotEmpty()
   @Transform(ToUpperCaseString)
   description: string;
+
+  @ApiProperty({
+    description: 'Fecha de la evolucion',
+    example: '2026-01-02',
+  })
+  @IsDateString()
+  @IsNotEmpty()
+  date: Date;
 }
 
 export class UpdateHospitalEvolutionDto {

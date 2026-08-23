@@ -26,7 +26,6 @@ export class AuthController {
   })
   @Get('me')
   getUserData(@ActiveUser() user: User) {
-    console.log("EJECUTADO EL ME")
     return user;
   }
 

@@ -20,11 +20,15 @@ import {
   UpdateHospitalEvolutionDto,
 } from './dto/hospital-evolution.dto';
 import { CreateDischargeDto, UpdateDischargeDto } from './dto/discharge.dto';
-import { PaginationQueryParamsDto } from '../utils/pagination/pagination.dto';
+import {
+  PaginationQueryParamsDto,
+  Scope,
+} from '../utils/pagination/pagination.dto';
 import { ActiveUser } from '../users/users.decorator';
 import { User } from '../users/entities/user.entity';
 import { FindOptionsWhere, IsNull } from 'typeorm';
 import { Admission } from './entities/admission.entity';
+import { Discharges } from './entities/discharges.entity';
 
 @ApiTags('clinical-records')
 @Controller('clinical-records')
@@ -46,12 +50,10 @@ export class ClinicalRecordsController {
   @Get('admissions')
   @ApiOperation({ summary: 'Get all admissions' })
   @ApiQuery({ name: 'status', required: false, enum: ['active'] })
-  @ApiQuery({ name: 'byUser', required: false, enum: ['active'] })
   findAllAdmissions(
     @Query() pagination: PaginationQueryParamsDto,
     @ActiveUser() activeUser: User,
     @Query('status') status?: string,
-    @Query('byUser') byUser?: string,
   ) {
     let whereCondition: FindOptionsWhere<Admission> | undefined = undefined;
 
@@ -62,7 +64,7 @@ export class ClinicalRecordsController {
         },
       };
     }
-    if (byUser === 'active') {
+    if (pagination.scope === Scope.ME) {
       whereCondition =
         whereCondition === undefined
           ? {
@@ -79,8 +81,8 @@ export class ClinicalRecordsController {
     }
 
     return this.clinicalRecordsService.findAllAdmissions(
-      whereCondition,
       pagination,
+      whereCondition,
     );
   }
 
@@ -174,8 +176,20 @@ export class ClinicalRecordsController {
 
   @Get('discharges')
   @ApiOperation({ summary: 'Get all discharges' })
-  findAllDischarges(@Query() pagination: PaginationQueryParamsDto) {
-    return this.clinicalRecordsService.findAllDischarges(pagination);
+  findAllDischarges(
+    @Query() pagination: PaginationQueryParamsDto,
+    @ActiveUser() user: User,
+  ) {
+    let whereCondition: FindOptionsWhere<Discharges> | undefined = undefined;
+    if (pagination.scope === Scope.ME) {
+      whereCondition = {
+        created_by: user.id,
+      };
+    }
+    return this.clinicalRecordsService.findAllDischarges(
+      pagination,
+      whereCondition,
+    );
   }
 
   @Get('discharges/:id/document')

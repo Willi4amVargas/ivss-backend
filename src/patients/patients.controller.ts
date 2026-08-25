@@ -16,12 +16,17 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { PatientsService } from './patients.service';
-import { PaginationQueryParamsDto } from '../utils/pagination/pagination.dto';
+import {
+  PaginationQueryParamsDto,
+  Scope,
+} from '../utils/pagination/pagination.dto';
 import { SearchType, SearchTypeDto } from './dto/search-type.dto';
 import { FindOneDto, FindOneType } from './dto/findone-type.dto';
 import { isUUID } from 'class-validator';
 import { ActiveUser } from '../users/users.decorator';
 import { User } from '../users/entities/user.entity';
+import { FindOptionsWhere, ILike } from 'typeorm';
+import { Patient } from './entities/patient.entity';
 
 @ApiTags('patients')
 @Controller('patients')
@@ -58,8 +63,20 @@ export class PatientsController {
     status: 200,
     description: 'Lista de pacientes devuelta exitosamente.',
   })
-  findAll(@Query() pagination: PaginationQueryParamsDto) {
-    return this.patientsService.findAll(pagination);
+  findAll(
+    @Query() pagination: PaginationQueryParamsDto,
+    @ActiveUser() user: User,
+  ) {
+    const whereCondition: FindOptionsWhere<Patient> =
+      pagination.scope === Scope.ME
+        ? {
+            status: true,
+            created_by: user.id,
+          }
+        : {
+            status: true,
+          };
+    return this.patientsService.findAll(pagination, whereCondition);
   }
 
   /**
@@ -73,23 +90,51 @@ export class PatientsController {
   searchBy(
     @Query() searchParams: SearchTypeDto,
     @Query() pagination: PaginationQueryParamsDto,
+    @ActiveUser() user: User,
   ) {
+    let whereCondition:
+      | FindOptionsWhere<Patient>
+      | FindOptionsWhere<Patient>[]
+      | undefined = undefined;
     if (searchParams.type === SearchType.DOCUMENT_ID) {
-      return this.patientsService.searchByCedula(searchParams.q, pagination);
+      whereCondition = {
+        document_id: ILike(`%${searchParams.q}%`),
+        status: true,
+      };
     } else if (searchParams.type === SearchType.HISTORY_NUMBER) {
-      return this.patientsService.searchByHistoryNumber(
-        searchParams.q,
-        pagination,
-      );
+      whereCondition = {
+        history_numbers: {
+          history_number: ILike(`%${searchParams.q}%`),
+        },
+        status: true,
+      };
     } else if (searchParams.type === SearchType.NAME) {
-      return this.patientsService.searchByNamesAndLastNames(
-        searchParams.q,
-        pagination,
-      );
+      whereCondition = [
+        {
+          lastnames: ILike(`%${searchParams.q}%`),
+          status: true,
+        },
+        {
+          names: ILike(`%${searchParams.q}%`),
+          status: true,
+        },
+      ];
     }
-    throw new BadRequestException(
-      `"${searchParams.type}" No es valor valido para buscar`,
-    );
+
+    if (pagination.scope === Scope.ME) {
+      if (Array.isArray(whereCondition)) {
+        whereCondition = whereCondition.map((e) => ({
+          ...e,
+          created_by: user.id,
+        }));
+      } else {
+        whereCondition = {
+          ...whereCondition,
+          created_by: user.id,
+        };
+      }
+    }
+    return this.patientsService.findAll(pagination, whereCondition);
   }
 
   /**
@@ -107,11 +152,15 @@ export class PatientsController {
           'El parámetro proporcionado debe ser un UUID válido',
         );
       }
-      return this.patientsService.findOne(value);
+      return this.patientsService.findOne({ id: value });
     } else if (findType.type === FindOneType.DOCUMENT_ID) {
-      return this.patientsService.findByCedula(value);
+      return this.patientsService.findOne({ document_id: value });
     } else if (findType.type === FindOneType.HISTORY_NUMBER) {
-      return this.patientsService.findByHistoryNumber(value);
+      return this.patientsService.findOne({
+        history_numbers: {
+          history_number: value,
+        },
+      });
     }
     throw new BadRequestException(
       `"${findType.type}" No es valor valido para buscar`,

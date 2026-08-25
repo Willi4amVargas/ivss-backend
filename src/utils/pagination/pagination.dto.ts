@@ -1,6 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
+
+export enum Scope {
+  ME = 'me',
+  ALL = "all"
+}
 
 export class PaginationQueryParamsDto {
   @ApiPropertyOptional({
@@ -29,4 +34,19 @@ export class PaginationQueryParamsDto {
   @Max(1000)
   @IsOptional()
   limit: number = 10;
+
+  @ApiPropertyOptional({
+    description: 'Alcance del query',
+    enum: Scope,
+    default: Scope.ME,
+  })
+  @IsOptional()
+  @IsEnum(Scope)
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') {
+      return Scope.ME;
+    }
+    return typeof value === 'string' ? value.toLowerCase() : value;
+  })
+  scope: Scope = Scope.ME;
 }

@@ -30,6 +30,7 @@ import { PaginationMeta } from '../utils/pagination/pagination.meta';
 import { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
 import { FilesService } from '../files/files.service';
 import e from 'express';
+import { getCacheKeyByWhere } from '../utils/cache/getCacheKeyByWhere';
 
 @Injectable()
 export class ClinicalRecordsService {
@@ -52,7 +53,9 @@ export class ClinicalRecordsService {
   // --- Admission & Admission Diagnosis ---
   async createAdmission(dto: CreateAdmissionDto, user_id: string) {
     // Validate patient exists
-    const patientExist = await this.patientsService.findOne(dto.patient_id);
+    const patientExist = await this.patientsService.findOne({
+      id: dto.patient_id,
+    });
 
     if (!patientExist) {
       throw new NotFoundException('El paciente no existe');
@@ -127,19 +130,11 @@ export class ClinicalRecordsService {
   }
 
   async findAllAdmissions(
-    where: FindOptionsWhere<Admission> | undefined = undefined,
     pagination: PaginationQueryParamsDto,
+    where?: FindOptionsWhere<Admission> | undefined,
   ) {
     const skip = pagination.limit * (pagination.page - 1);
-    const whereKey = where
-      ? Object.entries(where)
-          .map(
-            ([key, value]) =>
-              `${key}:${typeof value === 'object' ? JSON.stringify(value) : value}`,
-          )
-          .join('_')
-      : '';
-    const cacheKey = `admissions_page_${pagination.page}_limit_${pagination.limit}${whereKey !== '' ? `_${whereKey}` : ''}`;
+    const cacheKey = `admissions_page_${pagination.page}_limit_${pagination.limit}${getCacheKeyByWhere(where)}`;
     const [admissions, total] = await this.admissionRepo.findAndCount({
       relations: {
         patient: true,
@@ -690,9 +685,15 @@ export class ClinicalRecordsService {
     }
   }
 
-  async findAllDischarges(pagination: PaginationQueryParamsDto) {
+  async findAllDischarges(
+    pagination: PaginationQueryParamsDto,
+    where?:
+      | FindOptionsWhere<Discharges>
+      | FindOptionsWhere<Discharges>[]
+      | undefined,
+  ) {
     const skip = pagination.limit * (pagination.page - 1);
-    const cacheKey = `admissions_page_${pagination.page}_limit_${pagination.limit}`;
+    const cacheKey = `admissions_page_${pagination.page}_limit_${pagination.limit}${getCacheKeyByWhere(where)}`;
     const [discharges, total] = await this.dischargeRepo.findAndCount({
       relations: {
         discharges_diagnosis: true,
@@ -708,6 +709,7 @@ export class ClinicalRecordsService {
           description: true,
         },
       },
+      where,
       order: { created_at: 'DESC' },
       take: pagination.limit,
       skip,

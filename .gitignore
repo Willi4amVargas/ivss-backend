@@ -4,6 +4,9 @@
 /build
 /data
 
+# Swagger (generado con `pnpm swagger:export`)
+/swagger.json
+
 # Logs
 logs
 *.log

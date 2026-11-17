@@ -11,6 +11,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ProfileModule } from './profile/profile.module';
 import { MailModule } from './mail/mail.module';
+import { InitialSchema1794929755037 } from './migrations/1794929755037-InitialSchema';
 
 @Module({
   imports: [
@@ -49,9 +50,9 @@ import { MailModule } from './mail/mail.module';
           password: configService.get<string>('DB_PASSWORD', 'root'),
           database: configService.get<string>('DB_NAME', 'ivss'),
           autoLoadEntities: true,
-          synchronize: configService.get<string>('NODE_ENV') !== 'production',
+          synchronize: false,
           logging: configService.get<string>('NODE_ENV') === 'development',
-          migrations: [__dirname + '/migrations/**/*{.js,.ts}'],
+          migrations: [InitialSchema1794929755037],
           migrationsRun: true,
           cache: {
             type: 'redis',

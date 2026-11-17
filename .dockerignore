@@ -1,0 +1,18 @@
+node_modules
+dist
+data
+coverage
+
+.git
+.github
+.gitignore
+
+# Variables de entorno (secretos): nunca deben entrar en la imagen
+.env
+.env.*
+
+Dockerfile
+docker-compose.yaml
+
+*.md
+.vscode
